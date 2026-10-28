@@ -48,7 +48,7 @@ index 2173dfa..e2ac613 100644
  using std::toupper;
  
  FontManager fontManager;
-+static bool legacy_korean_font_enabled = false;
++static bool legacy_korean_font_enabled = true;
 +
 +void set_legacy_korean_font_enabled(bool enabled) {
 +	legacy_korean_font_enabled = enabled;
@@ -195,7 +195,7 @@ index f1f8a04..b62b1e5 100644
  	bool use_special_chars = (font_config == "original" || font_config == "serif");
  	set_font_map_use_special_chars(use_special_chars);
 +	std::string korean_font;
-+	config->value("config/gameplay/korean_font", korean_font, "no");
++	config->value("config/gameplay/korean_font", korean_font, "yes");
 +	Pentagram::tolower(korean_font);
 +	set_legacy_korean_font_enabled(korean_font == "yes" || korean_font == "true");
  
