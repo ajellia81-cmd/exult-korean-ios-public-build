@@ -1,0 +1,46 @@
+name: build-unsigned-ipa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Fetch upstream source
+        run: git clone --depth 1 https://github.com/exult/exult.git upstream
+
+      - name: Apply Korean renderer patch
+        working-directory: upstream
+        run: |
+          git apply --check ../patches/legacy-korean-font.patch
+          git apply ../patches/legacy-korean-font.patch
+
+      - name: Fetch pinned iOS dependencies
+        working-directory: upstream
+        run: >-
+          xcodebuild build -scheme git_clone_release_dependencies
+          -project ios/Exult.xcodeproj
+          CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+          CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
+
+      - name: Build unsigned app bundle
+        working-directory: upstream
+        run: >-
+          xcodebuild build -scheme Exult -configuration Release -sdk iphoneos
+          -project ios/Exult.xcodeproj -derivedDataPath "$GITHUB_WORKSPACE/build"
+          CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+          CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir -p ipa/Payload
+          cp -R build/Build/Products/Release-iphoneos/Exult.app ipa/Payload/
+          ditto -c -k --sequesterRsrc --keepParent ipa/Payload Exult-korean-engine-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Exult-korean-engine-unsigned
+          path: Exult-korean-engine-unsigned.ipa
