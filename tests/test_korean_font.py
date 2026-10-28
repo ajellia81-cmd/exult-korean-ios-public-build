@@ -2,7 +2,7 @@
 import pathlib, subprocess, tempfile
 source = pathlib.Path("upstream/shapes/font.cc").read_text()
 start = source.index("static bool legacy_korean_font_enabled")
-end = source.index("//\tWant a more restrictive", start)
+end = source.index("static unsigned char korean_ink_colour", start)
 production = source[start:end]
 prefix = r'''
 #include <cassert>
@@ -34,6 +34,19 @@ struct Image_buffer8 {
   if(x>=0 && x<64 && y>=0 && y<64) pixels[y*64+x]=c;
  }
 };
+
+struct Shape_frame {
+ static Image_buffer8* screen;
+ std::vector<unsigned char> pixels; int w,h;
+ Shape_frame(unsigned char* p,int w_,int h_,int,int,bool):pixels(p,p+w_*h_),w(w_),h(h_){}
+ void paint_rle(int x,int y) { paint_rle_remapped(x,y,nullptr); }
+ void paint_rle_remapped(int x,int y,unsigned char* trans) {
+  for(int r=0;r<h;++r) for(int c=0;c<w;++c)
+   if(pixels[r*w+c]!=255) screen->put_pixel8(trans?trans[pixels[r*w+c]]:pixels[r*w+c],x+c,y+r);
+ }
+};
+Image_buffer8* Shape_frame::screen=nullptr;
+
 '''
 tests = r'''
 std::vector<unsigned char> fixture(int w=9,int h=3) {
@@ -53,14 +66,15 @@ int main() {
  assert(!korean_font.is_pair("\xb0\0",2));
  assert(!korean_font.is_pair("\xcf\xa1",2));
  Image_buffer8 image;
+ Shape_frame::screen=&image;
  korean_font.paint(&image,2,4,first,nullptr);
- assert(image.pixels[4*64+2]==255 && image.pixels[4*64+10]==255);
+ assert(image.pixels[4*64+2]==1 && image.pixels[4*64+10]==1);
  assert(image.pixels[4*64+3]==0);
- unsigned char trans[256]={};trans[255]=42;
+ unsigned char trans[256]={};trans[1]=42;
  korean_font.paint(&image,2,4,first,trans);
  assert(image.pixels[4*64+2]==42);
  korean_font.paint(&image,2,4,last,nullptr);
- assert(image.pixels[6*64+10]==255); // Last glyph and padded row stride.
+ assert(image.pixels[6*64+10]==1); // Last glyph and padded row stride.
  set_legacy_korean_font_enabled(false);
  assert(!korean_font.is_pair(first,2));
  set_legacy_korean_font_enabled(true);

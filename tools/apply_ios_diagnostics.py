@@ -59,3 +59,82 @@ replace("audio/AudioMixer.cc", '\t\t\tSDL_ResumeAudioDevice(dev);',
         '\t\t\tif (!SDL_ResumeAudioDevice(dev)) {\n'
         '\t\t\t\tstd::cerr << "SDL audio resume failed: " << SDL_GetError() << std::endl;\n'
         '\t\t\t}')
+
+# Draw Korean through the same active screen/RLE path as ordinary font shapes.
+p = Path("upstream/shapes/font.cc")
+text = p.read_text()
+before = 'const unsigned char colour = trans ? trans[255] : 255;'
+after = '''std::vector<unsigned char> pixels(glyph_width * glyph_height, 255);
+        const unsigned char colour = ink_colour;'''
+assert text.count(before) == 1
+text = text.replace(before, after)
+text = text.replace('const char* text, unsigned char* trans) {',
+                    'const char* text, unsigned char* trans, unsigned char ink_colour = 1) {', 1)
+text = text.replace('win->put_pixel8(colour, x + col, y + row);',
+                    'pixels[row * glyph_width + col] = colour;', 1)
+needle = '\nprivate:\n\tstatic constexpr int glyph_count'
+assert text.count(needle) == 1
+text = text.replace(needle, '''
+        // Palette 255 is transparency in shape encoding, so ink must use the
+        // current font colour. Route through Shape_frame's active screen.
+''' + needle, 1)
+# Insert shape draw before the end of paint(), not after it.
+needle = '\t}\nprivate:\n\tstatic constexpr int glyph_count'
+# Comment above was inserted between these anchors; instead insert before comment.
+anchor = '\n        // Palette 255 is transparency'
+text = text.replace(anchor, anchor, 1)
+# Locate paint method's closing brace via the following comment.
+comment = text.index('        // Palette 255 is transparency')
+paint_end = text.rfind('\t}', 0, comment)
+text = text[:paint_end] + '''        Shape_frame frame(pixels.data(), glyph_width, glyph_height, 0, 0, true);
+        if (trans) frame.paint_rle_remapped(x, y, trans);
+        else frame.paint_rle(x, y);
+''' + text[paint_end:]
+# Sample an existing ASCII letter from this font into a temporary buffer.
+helper = '''
+static unsigned char korean_ink_colour(Shape_file* shapes) {
+    Shape_frame* reference = shapes->get_frame('A');
+    if (!reference || !reference->is_rle()) return 1;
+    const int w = reference->get_width(), h = reference->get_height();
+    Image_buffer8 sample(w, h);
+    sample.fill8(255);
+    reference->paint_rle(&sample, reference->get_xleft(), reference->get_yabove());
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            if (sample.get_pixel8(x, y) != 255) return sample.get_pixel8(x, y);
+    return 1;
+}
+'''
+anchor = '//\tWant a more restrictive test for space.'
+assert text.count(anchor) == 1
+text = text.replace(anchor, helper + '\n' + anchor)
+text = text.replace('korean_font.paint(win, x, yoff - korean_font.height() + 1, text, trans);',
+                    'korean_font.paint(win, x, yoff - get_text_baseline(), text, trans, korean_ink_colour(font_shapes.get()));')
+# Only grow height when a valid enabled Korean font is loaded.
+text = text.replace('return highest + lowest + 1;', '''return legacy_korean_font_enabled && korean_font.is_pair("\\xb0\\xa1", 2)
+        ? std::max(highest + lowest + 1, korean_font.height()) : highest + lowest + 1;''', 1)
+p.write_text(text)
+
+# One-time audio recovery. Preserve the user's configuration before changing it.
+replace("ios/ios_utils.mm", '    AVAudioSession* session = [AVAudioSession sharedInstance];',
+'''    NSString* cfg = [NSString stringWithUTF8String:(base + "/exult.cfg").c_str()];
+    NSString* backup = [NSString stringWithUTF8String:(base + "/exult-before-audio-repair.cfg").c_str()];
+    NSFileManager* manager = [NSFileManager defaultManager];
+    if ([manager fileExistsAtPath:cfg] && ![manager fileExistsAtPath:backup]) {
+        NSError* backupError = nil;
+        if (![manager copyItemAtPath:cfg toPath:backup error:&backupError])
+            fprintf(stderr, "Config backup failed: %s\\n", backupError.localizedDescription.UTF8String);
+    }
+    AVAudioSession* session = [AVAudioSession sharedInstance];''')
+replace("audio/Audio.cc", '\tconfig->value("config/audio/enabled", s, "yes");',
+'''    std::string repair_done;
+    config->value("config/audio/korean_audio_repair_v1", repair_done, "no");
+    if (repair_done != "yes") {
+        config->set("config/audio/enabled", "yes", false);
+        config->set("config/audio/midi/enabled", "yes", false);
+        config->set("config/audio/midi/use_oggs", "no", false);
+        config->set("config/audio/midi/driver", "FMOpl", false);
+        config->set("config/audio/korean_audio_repair_v1", "yes", false);
+        std::cerr << "Audio recovery: enabled FMOpl music once" << std::endl;
+    }
+\tconfig->value("config/audio/enabled", s, "yes");''')
