@@ -155,3 +155,52 @@ replace("shapes/font.cc", '#include "font.h"', '#include "font.h"\n#include "gam
 replace("shapes/font.cc", '\treturn highest;\n}', '''    return legacy_korean_font_enabled && korean_font.is_pair("\\xb0\\xa1", 2)
         ? std::max(highest, korean_font.height() - 1) : highest;
 }''')
+
+# Use a padded, outlined bitmap and account for the border in layout.
+p = Path("upstream/shapes/font.cc")
+text = p.read_text()
+text = text.replace('int width() const { return glyph_width; }',
+                    'int width() const { return glyph_width + 2; }')
+text = text.replace('int height() const { return glyph_height; }',
+                    'int height() const { return glyph_height + 2; }')
+start = text.index('\tvoid paint(Image_buffer8* win,')
+end = text.index('\nprivate:', start)
+text = text[:start] + r'''
+    void paint(Image_buffer8* win, int x, int y, const char* text,
+               unsigned char* trans, unsigned char ink_colour = 1,
+               unsigned char outline_colour = 0) {
+        const auto lead = static_cast<unsigned char>(text[0]);
+        const auto trail = static_cast<unsigned char>(text[1]);
+        const auto index = (lead - 0xb0) * 94 + (trail - 0xa1);
+        const auto* glyph = glyphs.data() + index * bytes_per_glyph;
+        const int w = width(), h = height();
+        std::vector<unsigned char> pixels(w * h, 255);
+        // Paint a one-pixel border, then the foreground. Separate passes
+        // prevent a later border pixel from erasing an earlier stroke.
+        if (outline_colour != ink_colour) {
+        for (int row = 0; row < glyph_height; ++row) {
+            for (int col = 0; col < glyph_width; ++col) {
+                if (!(glyph[row * bytes_per_row + col / 8] & (0x80 >> (col % 8)))) continue;
+                for (int dy = 0; dy < 3; ++dy)
+                    for (int dx = 0; dx < 3; ++dx)
+                        pixels[(row + dy) * w + col + dx] = outline_colour;
+            }
+        }
+        }
+        for (int row = 0; row < glyph_height; ++row)
+            for (int col = 0; col < glyph_width; ++col)
+                if (glyph[row * bytes_per_row + col / 8] & (0x80 >> (col % 8)))
+                    pixels[(row + 1) * w + col + 1] = ink_colour;
+        Shape_frame frame(pixels.data(), w, h, 0, 0, true);
+        if (trans) frame.paint_rle_remapped(x, y, trans);
+        else frame.paint_rle(x, y);
+    }
+''' + text[end:]
+text = text.replace('korean_ink_colour(Shape_file* shapes)', 'korean_ink_colour(Shape_file* shapes, bool outline = false)')
+text = text.replace('unsigned char selected = 1;\n    int best = -1;',
+                    'unsigned char selected = outline ? 0 : 1;\n    int best = outline ? 1000000 : -1;')
+text = text.replace('if (luminance > best) { best = luminance; selected = colour; }',
+                    'if (outline ? luminance < best : luminance > best) { best = luminance; selected = colour; }')
+text = text.replace('trans, korean_ink_colour(font_shapes.get()));',
+                    'trans, korean_ink_colour(font_shapes.get()), korean_ink_colour(font_shapes.get(), true));')
+p.write_text(text)

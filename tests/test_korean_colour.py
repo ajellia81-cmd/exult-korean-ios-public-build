@@ -43,6 +43,7 @@ tests = r'''
 int main(){
  Shape_file f;
  assert(korean_ink_colour(&f)==14);
+ assert(korean_ink_colour(&f,true)==1);
  f.frame.pixels.assign(9,1);
  assert(korean_ink_colour(&f)==1);
  f.frame.pixels.assign(9,255);

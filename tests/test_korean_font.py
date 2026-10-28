@@ -61,20 +61,23 @@ int main() {
  files["data"]=fixture();
  set_legacy_korean_font_enabled(true);
  assert(korean_font.is_pair(first,2));
- assert(korean_font.width()==9 && korean_font.height()==3);
+ assert(korean_font.width()==11 && korean_font.height()==5);
  assert(!korean_font.is_pair(first,1));
  assert(!korean_font.is_pair("\xb0\0",2));
  assert(!korean_font.is_pair("\xcf\xa1",2));
  Image_buffer8 image;
  Shape_frame::screen=&image;
+ std::fill(std::begin(image.pixels),std::end(image.pixels),7);
  korean_font.paint(&image,2,4,first,nullptr);
- assert(image.pixels[4*64+2]==1 && image.pixels[4*64+10]==1);
- assert(image.pixels[4*64+3]==0);
+ assert(image.pixels[5*64+3]==1 && image.pixels[5*64+11]==1);
+ assert(image.pixels[4*64+2]==0); // Outline at padded corner.
+ assert(image.pixels[5*64+4]==0); // Border beside first stroke.
+ assert(image.pixels[5*64+6]==7); // Transparent gap preserves background.
  unsigned char trans[256]={};trans[1]=42;
  korean_font.paint(&image,2,4,first,trans);
- assert(image.pixels[4*64+2]==42);
+ assert(image.pixels[5*64+3]==42);
  korean_font.paint(&image,2,4,last,nullptr);
- assert(image.pixels[6*64+10]==1); // Last glyph and padded row stride.
+ assert(image.pixels[7*64+11]==1); // Last glyph and padded row stride.
  set_legacy_korean_font_enabled(false);
  assert(!korean_font.is_pair(first,2));
  set_legacy_korean_font_enabled(true);
@@ -97,7 +100,7 @@ int main() {
  files["data"]=fixture(16,16);
  set_legacy_korean_font_enabled(true);
  assert(korean_font.is_pair(first,2));
- assert(korean_font.width()==16 && korean_font.height()==16);
+ assert(korean_font.width()==18 && korean_font.height()==18);
  std::cout<<"PASS: production loader/renderer synthetic regression checks\n";
 }
 '''
