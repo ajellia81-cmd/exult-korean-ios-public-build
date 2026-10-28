@@ -99,10 +99,22 @@ static unsigned char korean_ink_colour(Shape_file* shapes) {
     Image_buffer8 sample(w, h);
     sample.fill8(255);
     reference->paint_rle(&sample, reference->get_xleft(), reference->get_yabove());
-    for (int y = 0; y < h; ++y)
-        for (int x = 0; x < w; ++x)
-            if (sample.get_pixel8(x, y) != 255) return sample.get_pixel8(x, y);
-    return 1;
+    // The first opaque pixel is often the black outline. Select the
+    // brightest colour actually present in the reference letter instead.
+    unsigned char selected = 1;
+    int best = -1;
+    const Palette* palette = Game_window::get_instance()->get_pal();
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const unsigned char colour = sample.get_pixel8(x, y);
+            if (colour == 255) continue;
+            const int luminance = 299 * palette->get_red(colour)
+                                + 587 * palette->get_green(colour)
+                                + 114 * palette->get_blue(colour);
+            if (luminance > best) { best = luminance; selected = colour; }
+        }
+    }
+    return selected;
 }
 '''
 anchor = '//\tWant a more restrictive test for space.'
@@ -138,3 +150,8 @@ replace("audio/Audio.cc", '\tconfig->value("config/audio/enabled", s, "yes");',
         std::cerr << "Audio recovery: enabled FMOpl music once" << std::endl;
     }
 \tconfig->value("config/audio/enabled", s, "yes");''')
+
+replace("shapes/font.cc", '#include "font.h"', '#include "font.h"\n#include "gamewin.h"\n#include "palette.h"')
+replace("shapes/font.cc", '\treturn highest;\n}', '''    return legacy_korean_font_enabled && korean_font.is_pair("\\xb0\\xa1", 2)
+        ? std::max(highest, korean_font.height() - 1) : highest;
+}''')

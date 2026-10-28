@@ -31,7 +31,9 @@ jobs:
         run: python3 tools/apply_ios_diagnostics.py
 
       - name: Test production Korean font loader with synthetic data
-        run: python3 tests/test_korean_font.py
+        run: |
+          python3 tests/test_korean_font.py
+          python3 tests/test_korean_colour.py
 
       - name: Fetch pinned iOS dependencies
         working-directory: upstream
