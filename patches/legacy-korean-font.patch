@@ -30,7 +30,7 @@ diff --git a/shapes/font.cc b/shapes/font.cc
 index 2173dfa..e2ac613 100644
 --- a/shapes/font.cc
 +++ b/shapes/font.cc
-@@ -25,14 +25,88 @@
+@@ -25,16 +25,91 @@
  #include "U7file.h"
  #include "databuf.h"
  #include "exceptions.h"
@@ -190,7 +190,7 @@ diff --git a/game.cc b/game.cc
 index f1f8a04..b62b1e5 100644
 --- a/game.cc
 +++ b/game.cc
-@@ -209,6 +209,13 @@ void Game::setup_text() {
+@@ -209,5 +209,9 @@ void Game::setup_text() {
  	Pentagram::tolower(font_config);
  	bool use_special_chars = (font_config == "original" || font_config == "serif");
  	set_font_map_use_special_chars(use_special_chars);
