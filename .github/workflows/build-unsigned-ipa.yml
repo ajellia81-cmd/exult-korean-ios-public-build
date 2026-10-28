@@ -9,9 +9,17 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-15' || 'ubuntu-latest' }}
+    env:
+      DEVELOPER_DIR: ${{ github.ref == 'refs/heads/main' && '/Applications/Xcode_26.3.app/Contents/Developer' || '' }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Verify selected Apple toolchain
+        if: github.ref == 'refs/heads/main'
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
 
       - name: Fetch upstream source
         run: |
