@@ -16,6 +16,7 @@ using std::size_t;
 #define STATIC_KOREAN_FONT "static"
 #define KOREAN_FONT "data"
 std::map<std::string, std::vector<unsigned char>> files;
+std::string get_system_path(const char* p) { return p; }
 bool U7exists(const char* p) { return files.count(p); }
 struct IFileDataSource {
  const std::vector<unsigned char>& b; size_t pos=0; bool ok=true;

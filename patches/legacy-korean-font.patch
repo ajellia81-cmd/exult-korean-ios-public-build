@@ -30,7 +30,7 @@ diff --git a/shapes/font.cc b/shapes/font.cc
 index 2173dfa..e2ac613 100644
 --- a/shapes/font.cc
 +++ b/shapes/font.cc
-@@ -25,16 +25,123 @@
+@@ -25,16 +25,142 @@
  #include "U7file.h"
  #include "databuf.h"
  #include "exceptions.h"
@@ -51,9 +51,11 @@ index 2173dfa..e2ac613 100644
 +static bool legacy_korean_font_enabled = true;
 +static unsigned korean_font_generation = 0;
 +
++static void probe_korean_font();
 +void set_legacy_korean_font_enabled(bool enabled) {
 +	legacy_korean_font_enabled = enabled;
 +	++korean_font_generation; // Game paths may have changed since menu rendering.
++	probe_korean_font();
 +}
 +
 +namespace {
@@ -64,6 +66,11 @@ index 2173dfa..e2ac613 100644
 +			return false;
 +		}
 +		const auto first = static_cast<unsigned char>(text[0]);
++		static bool reported_utf8 = false;
++		if (!reported_utf8 && first >= 0xe0 && first <= 0xef) {
++			reported_utf8 = true;
++			std::cerr << "Korean diagnostic: UTF-8-like lead encountered; renderer expects EUC-KR" << std::endl;
++		}
 +		if (first < 0xb0 || first > 0xc8) return false;
 +		load();
 +		if (!loaded) {
@@ -76,6 +83,11 @@ index 2173dfa..e2ac613 100644
 +	int width() const { return glyph_width; }
 +	int height() const { return glyph_height; }
 +	void paint(Image_buffer8* win, int x, int y, const char* text, unsigned char* trans) {
++		static bool reported_paint = false;
++		if (!reported_paint) {
++			reported_paint = true;
++			std::cerr << "Korean diagnostic: bitmap painting reached" << std::endl;
++		}
 +		const auto lead = static_cast<unsigned char>(text[0]);
 +		const auto trail = static_cast<unsigned char>(text[1]);
 +		const auto index = (lead - 0xb0) * 94 + (trail - 0xa1);
@@ -100,12 +112,14 @@ index 2173dfa..e2ac613 100644
 +	int bytes_per_glyph = 0;
 +	std::vector<unsigned char> glyphs;
 +	bool load_file(const char* path) {
-+		if (!U7exists(path)) return false;
++		std::cerr << "Korean font probe: " << get_system_path(path) << std::endl;
++		if (!U7exists(path)) { std::cerr << "Korean font: missing" << std::endl; return false; }
 +		IFileDataSource data(path);
 +		if (!data.good() || data.getSize() < 4) {
 +			std::cerr << "Korean font: unreadable/short header at " << path << std::endl;
 +			return false;
 +		}
++		std::cerr << "Korean font: file bytes=" << data.getSize() << std::endl;
 +		data.skip(2);
 +		glyph_width = data.read1();
 +		glyph_height = data.read1();
@@ -115,6 +129,7 @@ index 2173dfa..e2ac613 100644
 +		}
 +		bytes_per_row = (glyph_width + 7) / 8;
 +		bytes_per_glyph = bytes_per_row * glyph_height;
++		std::cerr << "Korean font: header dimensions=" << glyph_width << "x" << glyph_height << std::endl;
 +		const size_t expected = static_cast<size_t>(glyph_count) * bytes_per_glyph;
 +		if (data.getAvail() != expected) {
 +			std::cerr << "Korean font: expected " << expected << " bitmap bytes, got "
@@ -150,6 +165,10 @@ index 2173dfa..e2ac613 100644
 +	}
 +};
 +Korean_font korean_font;
++}
++static void probe_korean_font() {
++	std::cerr << "Korean diagnostic: enabled=" << legacy_korean_font_enabled << std::endl;
++	korean_font.is_pair("\xb0\xa1", 2);
 +}
  
  //	Want a more restrictive test for space.
