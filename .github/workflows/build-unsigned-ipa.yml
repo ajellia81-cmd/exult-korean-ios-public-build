@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-latest' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
 

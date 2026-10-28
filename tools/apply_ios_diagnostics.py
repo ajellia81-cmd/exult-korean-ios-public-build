@@ -453,3 +453,86 @@ needle="case SDL_EVENT_WINDOW_FOCUS_GAINED:\n"
 assert text.count(needle)==2
 text=text.replace(needle, needle + "#ifdef SDL_PLATFORM_IOS\n    if (exult_ios_background.load()) break;\n#endif\n")
 p.write_text(text)
+
+# Approved C: scale ASCII ink in Korean text by 11/9, then rebuild the same
+# outline/drop shadow. English-only menus retain their original font shapes.
+replace("shapes/font.h", "public:\n\tFont();",
+        "    bool legacy_korean_layout_override = false;\npublic:\n\tFont();")
+p=Path("upstream/shapes/font.cc")
+text=p.read_text()
+text=text.replace('#include "palette.h"', '#include "palette.h"\n#include <cmath>')
+needle="static int korean_fixed_text_width"
+assert text.count(needle)==1
+text=text.replace(needle, "\nstruct Korean_ascii_glyph {\n    std::vector<unsigned char> pixels;\n    int w = 0, h = 0, xleft = 0, yabove = 0, step = 0;\n    Korean_ascii_glyph(Shape_frame* source, int hlead, unsigned char shadow) {\n        const int sw = source->get_width(), sh = source->get_height();\n        Image_buffer8 sample(sw, sh);\n        sample.fill8(255);\n        source->paint_rle(&sample, source->get_xleft(), source->get_yabove());\n        int xmin = sw, ymin = sh, xmax = -1, ymax = -1;\n        bool monochrome = false;\n        auto bounds = [&](bool include_shadow) {\n            for (int y = 0; y < sh; ++y) for (int x = 0; x < sw; ++x) {\n                const auto c = sample.get_pixel8(x, y);\n                if (c == 255 || (!include_shadow && c == shadow)) continue;\n                xmin = std::min(xmin, x); ymin = std::min(ymin, y);\n                xmax = std::max(xmax, x); ymax = std::max(ymax, y);\n            }\n        };\n        bounds(false);\n        if (xmax < 0) { monochrome = true; bounds(true); }\n        const double scale = 11.0 / 9.0;\n        if (xmax < 0) {\n            step = std::max(0, static_cast<int>(std::lround((sw + hlead) * scale)));\n            return;\n        }\n        const int oldw = xmax - xmin + 1, oldh = ymax - ymin + 1;\n        const int iw = std::max(1, static_cast<int>(std::lround(oldw * scale)));\n        const int ih = std::max(1, static_cast<int>(std::lround(oldh * scale)));\n        const int left = static_cast<int>(std::lround((xmin - source->get_xleft()) * scale));\n        const int top = static_cast<int>(std::lround((ymin - source->get_yabove()) * scale));\n        w = iw + 3; h = ih + 3; xleft = 1 - left; yabove = 1 - top;\n        pixels.assign(w * h, 255);\n        std::vector<unsigned char> ink(w * h, 255);\n        for (int y = 0; y < ih; ++y) for (int x = 0; x < iw; ++x) {\n            const int sx = xmin + std::min(oldw - 1, static_cast<int>(x / scale));\n            const int sy = ymin + std::min(oldh - 1, static_cast<int>(y / scale));\n            const auto c = sample.get_pixel8(sx, sy);\n            if (c == 255 || (!monochrome && c == shadow)) continue;\n            ink[(y + 1) * w + x + 1] = c;\n            if (!monochrome)\n                for (int dy = 0; dy < 3; ++dy) for (int dx = 0; dx < 3; ++dx)\n                    pixels[(y + dy) * w + x + dx] = shadow;\n        }\n        if (!monochrome) {\n            const auto border = pixels;\n            for (int y = 0; y + 1 < h; ++y) for (int x = 0; x + 1 < w; ++x)\n                if (border[y * w + x] != 255) pixels[(y + 1) * w + x + 1] = shadow;\n        }\n        int right = -1;\n        for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {\n            if (ink[y * w + x] != 255) pixels[y * w + x] = ink[y * w + x];\n            if (pixels[y * w + x] != 255) right = std::max(right, x - xleft);\n        }\n        step = right + 1;\n    }\n    int advance() const { return step; }\n    void paint(int x, int y, unsigned char* trans) {\n        if (pixels.empty()) return;\n        Shape_frame frame(pixels.data(), w, h, xleft, yabove, true);\n        if (trans) frame.paint_rle_remapped(x, y, trans); else frame.paint_rle(x, y);\n    }\n};\n\nstatic bool contains_legacy_korean(const char* text, int length) {\n    if (!text) return false;\n    if (length < 0) length = static_cast<int>(std::strlen(text));\n    for (int i = 0; i < length; ++i)\n        if (korean_font.is_pair(text + i, length - i)) return true;\n    return false;\n}\nstruct Korean_layout_scope {\n    bool& slot;\n    const bool saved;\n    Korean_layout_scope(bool& value, bool korean) : slot(value), saved(value) { slot = slot || korean; }\n    ~Korean_layout_scope() { slot = saved; }\n};\n" + "\n" + needle)
+# Guard complete paragraphs so measurements of Latin-only words/spaces agree
+# with their rendering in a mixed Korean paragraph.
+for name in ("paint_text_box", "paint_text_box_fixedwidth", "find_cursor"):
+    start=text.index("int Font::"+name+"(")
+    brace=text.index("{",start)
+    text=text[:brace+1] + "\n    Korean_layout_scope layout(legacy_korean_layout_override, contains_legacy_korean(text, -1));" + text[brace+1:]
+# Determine style once before pointers are advanced.
+for name in ("paint_text", "paint_text_fixedwidth", "get_text_width", "find_xcursor", "get_text_box_dims"):
+    pattern=r"(?:int|void) Font::"+name+r"\("
+    for match in reversed(list(re.finditer(pattern,text))):
+        brace=text.index("{",match.start())
+        bounded=bool(re.search(r"\btextlen\b",text[match.start():brace]))
+        length="textlen" if bounded else "-1"
+        text=text[:brace+1]+"\n    const bool korean_layout = legacy_korean_layout_override || contains_legacy_korean(text, "+length+");"+text[brace+1:]
+# Latin text inside a mixed paragraph uses its parent's baseline as well.
+text=text.replace("if (!text) return get_text_baseline();",
+                  "if (legacy_korean_layout_override) return std::max(get_text_baseline(), korean_font.height() - 3);\n    if (!text) return get_text_baseline();")
+# Drawing overloads.
+for name in ("paint_text", "paint_text_fixedwidth"):
+    for match in reversed(list(re.finditer(r"int Font::"+name+r"\(",text))):
+        start=match.start();brace=text.index("{",start);depth=0
+        for end in range(brace,len(text)):
+            if text[end]=="{":depth+=1
+            elif text[end]=="}":
+                depth-=1
+                if depth==0:break
+        section=text[start:end+1]
+        needle="\t\t\tif (trans) {" if name=="paint_text" else "\t\tif (trans) {"
+        assert section.count(needle)==1
+        if name=="paint_text":
+            addition='''            if (korean_layout) {
+                Korean_ascii_glyph glyph(shape, hor_lead, korean_ink_colour(font_shapes.get(), true));
+                glyph.paint(x, yoff, trans);
+                x += glyph.advance();
+                continue;
+            }
+'''
+        else:
+            addition='''        if (korean_layout) {
+            Korean_ascii_glyph glyph(shape, hor_lead, korean_ink_colour(font_shapes.get(), true));
+            // Undo the legacy centring step already applied above.
+            x -= w;
+            const int advance = std::max(width, glyph.advance());
+            glyph.paint(x + (advance - glyph.advance()) / 2, yoff, trans);
+            x += advance;
+            continue;
+        }
+'''
+        section=section.replace(needle,addition+needle)
+        text=text[:start]+section+text[end+1:]
+# Shared measurement/cursor formula for scaled ASCII.
+text=text.replace("width += shape->get_width() + hor_lead;",
+                  "width += korean_layout ? Korean_ascii_glyph(shape, hor_lead, korean_ink_colour(font_shapes.get(), true)).advance() : shape->get_width() + hor_lead;")
+text=text.replace("cur_width += shape->get_width() + hor_lead;",
+                  "cur_width += korean_layout ? Korean_ascii_glyph(shape, hor_lead, korean_ink_colour(font_shapes.get(), true)).advance() : shape->get_width() + hor_lead;")
+text=text.replace("const int w = shape->get_width() + hor_lead;",
+                  "const int w = korean_layout ? Korean_ascii_glyph(shape, hor_lead, korean_ink_colour(font_shapes.get(), true)).advance() : shape->get_width() + hor_lead;")
+# Preserve Korean context when '^' uppercases the first Latin character.
+needle="width        = get_text_width(&c, 1u) + get_text_width(text + 1, static_cast<uint32>(ewrd - text - 1));"
+assert text.count(needle)==2
+text=text.replace(needle, "std::string capitalized(text, ewrd - text);\n            if (!capitalized.empty()) capitalized[0] = c;\n            width = get_text_width(capitalized.c_str());")
+# Fixed-width layout uses the same expanded ASCII advance as its draw path.
+text=text.replace("korean_fixed_text_width(const char* text, int length, int cell)",
+                  "korean_fixed_text_width(const char* text, int length, int cell, Shape_file* shapes = nullptr, bool style = false, int hlead = 0)")
+text=text.replace("result += cell;\n            ++text; --length;",
+'''            auto* shape = shapes ? shapes->get_frame(static_cast<unsigned char>(*text)) : nullptr;
+            result += style && shape && shape->is_rle()
+                ? std::max(cell, Korean_ascii_glyph(shape, hlead, korean_ink_colour(shapes, true)).advance()) : cell;
+            ++text; --length;''')
+text=text.replace("korean_fixed_text_width(text, static_cast<int>(ewrd - text), char_width)",
+                  "korean_fixed_text_width(text, static_cast<int>(ewrd - text), char_width, font_shapes.get(), legacy_korean_layout_override, hor_lead)")
+p.write_text(text)

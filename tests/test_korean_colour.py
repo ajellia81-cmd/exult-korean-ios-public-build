@@ -2,7 +2,7 @@
 import pathlib, subprocess, tempfile
 s = pathlib.Path("upstream/shapes/font.cc").read_text()
 a = s.index("static unsigned char korean_ink_colour")
-b = s.index("static int korean_fixed_text_width", a)
+b = s.index("struct Korean_ascii_glyph", a)
 helper = s[a:b]
 prefix = r'''
 #include <vector>

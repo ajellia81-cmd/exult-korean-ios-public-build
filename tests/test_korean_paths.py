@@ -24,7 +24,7 @@ def overloads(start):
                     out.append(s[a:i+1]);offset=i+1;break
 tree=ast.parse(pathlib.Path("tests/test_korean_font.py").read_text())
 prefix=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="prefix" for t in n.targets))
-prefix=prefix.replace("#include <cassert>","#include <cassert>\n#include <algorithm>\n#include <memory>")
+prefix=prefix.replace("#include <cassert>","#include <cassert>\n#include <algorithm>\n#include <memory>\n#include <cmath>")
 prefix=prefix.replace(" unsigned char pixels[64*64]={};",''' unsigned char pixels[64*64]={};
  Image_buffer8()=default;
  Image_buffer8(int,int){}
@@ -61,6 +61,7 @@ struct Game_window {
 template<typename T> void ignore_unused_variable_warning(const T&){}
 struct Font {
  std::unique_ptr<Shape_file> font_shapes=std::make_unique<Shape_file>();
+ bool legacy_korean_layout_override=false;
  int highest=10,lowest=3,hor_lead=-1,ver_lead=0;
  int paint_text(Image_buffer8*,const char*,int,int,unsigned char* =nullptr);
  int paint_text(Image_buffer8*,const char*,int,int,int,unsigned char* =nullptr);
@@ -119,8 +120,8 @@ int main(){
   assert(f.find_xcursor(raw.data(),2,advance)==-1);
   assert(korean_fixed_text_width(raw.data(),2,7)==15);
   auto mixed=std::string("\"")+raw+"!?\"";
-  assert(f.get_text_width(mixed.c_str())==advance+8);
-  assert(f.find_xcursor(mixed.data(),int(mixed.size()),2)==1);
+  assert(f.get_text_width(mixed.c_str())==advance+16);
+  assert(f.find_xcursor(mixed.data(),int(mixed.size()),4)==1);
   ++checked;
  }
  assert(f.font_shapes->high_requests==0);
