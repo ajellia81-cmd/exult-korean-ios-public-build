@@ -27,6 +27,7 @@ prefix=r'''
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <algorithm>
 using std::size_t;
 std::unordered_map<std::string,std::string> utf8_to_font_special,utf8_to_font_ascii;
 void ensure_font_maps_loaded() {}
@@ -56,12 +57,28 @@ int main(){
   }
   if(old_bad) damaged.push_back(i);
  }
- long long combinations=0;
- for(const auto& first:glyphs) for(const auto& second:glyphs) {
+ long long combinations=0, old_pair_damage=0, boundary_only=0;
+ std::vector<int> boundary_first;
+ std::vector<std::pair<int,int>> boundary_examples;
+ int first_index=-1;
+ for(const auto& first:glyphs) { ++first_index; int second_index=-1;
+ for(const auto& second:glyphs) { ++second_index;
   const auto raw=first+second;
+  bool old_bad=false, singles_ok=true;
+  for(bool mode:{false,true}){
+   auto prior=raw;baseline_translate(prior,mode);old_bad=old_bad || prior!=raw;
+   auto a=first,b=second;baseline_translate(a,mode);baseline_translate(b,mode);
+   singles_ok=singles_ok && a==first && b==second;
+  }
+  if(old_bad)++old_pair_damage;
+  if(old_bad && singles_ok){
+   ++boundary_only;
+   if(std::find(boundary_first.begin(),boundary_first.end(),first_index)==boundary_first.end())boundary_first.push_back(first_index);
+   if(boundary_examples.size()<8)boundary_examples.emplace_back(first_index,second_index);
+  }
   for(bool mode:{false,true}) { auto copy=raw;translate_utf8_to_font_hex(copy,mode);assert(copy==raw); }
   ++combinations;
- }
+ }}
  // A malformed pair must not be accepted as complete Korean text.
  assert(!is_legacy_korean_text(std::string("\xb0",1)));
  assert(!is_legacy_korean_text(std::string("\xb0" "A",2)));
@@ -75,6 +92,10 @@ int main(){
  }
  std::cout<<"{\"glyphs\":2350,\"ordered_pairs\":"<<combinations<<",\"map_modes\":2,\"damaged_indices\":[";
  for(size_t i=0;i<damaged.size();++i){if(i)std::cout<<",";std::cout<<damaged[i];}
+ std::cout<<"],\"previously_corrupted_pairs\":"<<old_pair_damage<<",\"boundary_only_pairs\":"<<boundary_only<<",\"boundary_first_indices\":[";
+ for(size_t i=0;i<boundary_first.size();++i){if(i)std::cout<<",";std::cout<<boundary_first[i];}
+ std::cout<<"],\"boundary_examples\":[";
+ for(size_t i=0;i<boundary_examples.size();++i){if(i)std::cout<<",";std::cout<<"["<<boundary_examples[i].first<<","<<boundary_examples[i].second<<"]";}
  std::cout<<"]}\n";
 }
 '''
@@ -86,6 +107,10 @@ with tempfile.TemporaryDirectory() as d:
     result=json.loads(subprocess.check_output([str(exe)],text=True))
 result["previously_corrupted_characters"]="".join(bytes((0xb0+i//94,0xa1+i%94)).decode("euc_kr") for i in result.pop("damaged_indices"))
 result["previously_corrupted_count"]=len(result["previously_corrupted_characters"])
+def syllable(i): return bytes((0xb0+i//94,0xa1+i%94)).decode("euc_kr")
+result["boundary_vulnerable_characters"]="".join(syllable(i) for i in result.pop("boundary_first_indices"))
+result["boundary_vulnerable_character_count"]=len(result["boundary_vulnerable_characters"])
+result["boundary_examples"]=["".join(syllable(i) for i in pair) for pair in result["boundary_examples"]]
 result["unsupported_cp949_hangul"]=sum(not(0xb0<=c.encode("cp949")[0]<=0xc8 and 0xa1<=c.encode("cp949")[1]<=0xfe) for c in map(chr,range(0xac00,0xd7a4)))
 pathlib.Path("korean-audit.json").write_text(json.dumps(result,ensure_ascii=False,indent=2))
 print(json.dumps(result,ensure_ascii=False,indent=2))
