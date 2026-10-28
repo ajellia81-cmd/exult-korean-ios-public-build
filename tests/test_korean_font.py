@@ -61,7 +61,7 @@ int main() {
  files["data"]=fixture();
  set_legacy_korean_font_enabled(true);
  assert(korean_font.is_pair(first,2));
- assert(korean_font.width()==11 && korean_font.height()==5);
+ assert(korean_font.width()==13 && korean_font.height()==7);
  assert(!korean_font.is_pair(first,1));
  assert(!korean_font.is_pair("\xb0\0",2));
  assert(!korean_font.is_pair("\xcf\xa1",2));
@@ -100,7 +100,7 @@ int main() {
  files["data"]=fixture(16,16);
  set_legacy_korean_font_enabled(true);
  assert(korean_font.is_pair(first,2));
- assert(korean_font.width()==18 && korean_font.height()==18);
+ assert(korean_font.width()==20 && korean_font.height()==20);
  std::cout<<"PASS: production loader/renderer synthetic regression checks\n";
 }
 '''

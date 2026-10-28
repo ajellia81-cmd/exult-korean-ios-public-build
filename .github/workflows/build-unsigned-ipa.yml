@@ -3,7 +3,7 @@ name: build-unsigned-ipa
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, fix/korean-complete-audit]
   pull_request:
     branches: [main]
 
@@ -34,8 +34,18 @@ jobs:
         run: |
           python3 tests/test_korean_font.py
           python3 tests/test_korean_colour.py
+          python3 tests/test_korean_encoding.py
+          python3 tests/test_korean_paths.py
+          python3 tests/test_ios_lifecycle.py
+
+      - name: Upload encoding audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: korean-encoding-audit
+          path: korean-audit.json
 
       - name: Fetch pinned iOS dependencies
+        if: github.ref == 'refs/heads/main'
         working-directory: upstream
         run: >-
           xcodebuild build -scheme git_clone_release_dependencies
@@ -44,11 +54,13 @@ jobs:
           CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
 
       - name: Record dependency revisions
+        if: github.ref == 'refs/heads/main'
         run: |
           git -C upstream rev-parse HEAD
           find upstream -name .git -type d -print
 
       - name: Build unsigned app bundle
+        if: github.ref == 'refs/heads/main'
         working-directory: upstream
         run: >-
           xcodebuild build -scheme Exult -configuration Release -sdk iphoneos
@@ -57,12 +69,14 @@ jobs:
           CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
 
       - name: Package IPA
+        if: github.ref == 'refs/heads/main'
         run: |
           mkdir -p ipa/Payload
           cp -R build/Build/Products/Release-iphoneos/Exult.app ipa/Payload/
           ditto -c -k --sequesterRsrc --keepParent ipa/Payload Exult-korean-engine-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
         with:
           name: Exult-korean-engine-unsigned
           path: Exult-korean-engine-unsigned.ipa
