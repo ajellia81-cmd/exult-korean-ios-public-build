@@ -536,3 +536,9 @@ text=text.replace("result += cell;\n            ++text; --length;",
 text=text.replace("korean_fixed_text_width(text, static_cast<int>(ewrd - text), char_width)",
                   "korean_fixed_text_width(text, static_cast<int>(ewrd - text), char_width, font_shapes.get(), legacy_korean_layout_override, hor_lead)")
 p.write_text(text)
+
+# Detaching a gump must detach its compositor layers before callbacks can
+# open another modal or enter a blocking conversation in a derived destructor.
+replace("gumps/Gump_manager.cc", "bool Gump_manager::remove_gump(Gump* gump) {",
+'''bool Gump_manager::remove_gump(Gump* gump) {
+    gump->free_render_layer();''')
