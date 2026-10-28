@@ -22,6 +22,9 @@ jobs:
           git apply --check ../patches/legacy-korean-font.patch
           git apply ../patches/legacy-korean-font.patch
 
+      - name: Test production Korean font loader with synthetic data
+        run: python3 tests/test_korean_font.py
+
       - name: Fetch pinned iOS dependencies
         working-directory: upstream
         run: >-

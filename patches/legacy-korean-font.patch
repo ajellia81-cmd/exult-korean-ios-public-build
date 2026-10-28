@@ -30,7 +30,7 @@ diff --git a/shapes/font.cc b/shapes/font.cc
 index 2173dfa..e2ac613 100644
 --- a/shapes/font.cc
 +++ b/shapes/font.cc
-@@ -25,16 +25,91 @@
+@@ -25,16 +25,123 @@
  #include "U7file.h"
  #include "databuf.h"
  #include "exceptions.h"
@@ -49,9 +49,11 @@ index 2173dfa..e2ac613 100644
  
  FontManager fontManager;
 +static bool legacy_korean_font_enabled = true;
++static unsigned korean_font_generation = 0;
 +
 +void set_legacy_korean_font_enabled(bool enabled) {
 +	legacy_korean_font_enabled = enabled;
++	++korean_font_generation; // Game paths may have changed since menu rendering.
 +}
 +
 +namespace {
@@ -61,6 +63,8 @@ index 2173dfa..e2ac613 100644
 +		if (!legacy_korean_font_enabled || remaining < 2) {
 +			return false;
 +		}
++		const auto first = static_cast<unsigned char>(text[0]);
++		if (first < 0xb0 || first > 0xc8) return false;
 +		load();
 +		if (!loaded) {
 +			return false;
@@ -87,6 +91,7 @@ index 2173dfa..e2ac613 100644
 +	}
 +private:
 +	static constexpr int glyph_count = 25 * 94;
++	unsigned generation = static_cast<unsigned>(-1);
 +	bool attempted = false;
 +	bool loaded = false;
 +	int glyph_width = 0;
@@ -97,24 +102,51 @@ index 2173dfa..e2ac613 100644
 +	bool load_file(const char* path) {
 +		if (!U7exists(path)) return false;
 +		IFileDataSource data(path);
-+		if (!data.good()) return false;
++		if (!data.good() || data.getSize() < 4) {
++			std::cerr << "Korean font: unreadable/short header at " << path << std::endl;
++			return false;
++		}
 +		data.skip(2);
 +		glyph_width = data.read1();
 +		glyph_height = data.read1();
-+		if (glyph_width <= 0 || glyph_width > 32 || glyph_height <= 0 || glyph_height > 32) return false;
++		if (glyph_width <= 0 || glyph_width > 32 || glyph_height <= 0 || glyph_height > 32) {
++			std::cerr << "Korean font: unsupported dimensions at " << path << std::endl;
++			return false;
++		}
 +		bytes_per_row = (glyph_width + 7) / 8;
 +		bytes_per_glyph = bytes_per_row * glyph_height;
-+		glyphs.resize(glyph_count * bytes_per_glyph);
++		const size_t expected = static_cast<size_t>(glyph_count) * bytes_per_glyph;
++		if (data.getAvail() != expected) {
++			std::cerr << "Korean font: expected " << expected << " bitmap bytes, got "
++			          << data.getAvail() << " at " << path << std::endl;
++			return false;
++		}
++		glyphs.resize(expected);
 +		data.read(glyphs.data(), glyphs.size());
-+		return data.good();
++		if (!data.good()) return false;
++		bool ink = false;
++		for (auto byte : glyphs) ink = ink || byte != 0;
++		if (!ink) {
++			std::cerr << "Korean font: empty bitmap at " << path << std::endl;
++			return false;
++		}
++		std::cerr << "Korean font: loaded " << path << " (" << glyph_width << "x"
++		          << glyph_height << ", EUC-KR 2350 glyphs)" << std::endl;
++		return true;
 +	}
 +	void load() {
++		if (generation != korean_font_generation) {
++			generation = korean_font_generation;
++			attempted = loaded = false;
++			glyphs.clear();
++		}
 +		if (attempted) return;
 +		attempted = true;
 +		const char* paths[] = {PATCH_KOREAN_FONT, STATIC_KOREAN_FONT, KOREAN_FONT};
 +		for (const char* path : paths) {
 +			if (load_file(path)) { loaded = true; return; }
 +		}
++		std::cerr << "Korean font: no valid korean.fnt in PATCH, STATIC or DATA" << std::endl;
 +	}
 +};
 +Korean_font korean_font;
