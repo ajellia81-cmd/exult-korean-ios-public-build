@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-15' || 'ubuntu-latest' }}
+    runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-15-intel' || 'ubuntu-latest' }}
     env:
       DEVELOPER_DIR: ${{ github.ref == 'refs/heads/main' && '/Applications/Xcode_26.3.app/Contents/Developer' || '' }}
     steps:
