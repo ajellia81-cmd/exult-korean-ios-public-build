@@ -124,7 +124,7 @@ text = text.replace('korean_font.paint(win, x, yoff - korean_font.height() + 1, 
                     'korean_font.paint(win, x, yoff - get_text_baseline(), text, trans, korean_ink_colour(font_shapes.get()));')
 # Only grow height when a valid enabled Korean font is loaded.
 text = text.replace('return highest + lowest + 1;', '''return legacy_korean_font_enabled && korean_font.is_pair("\\xb0\\xa1", 2)
-        ? std::max(highest + lowest + 1, korean_font.height()) : highest + lowest + 1;''', 1)
+        ? std::max(highest, korean_font.height() - 1) + lowest + 1 : highest + lowest + 1;''', 1)
 p.write_text(text)
 
 # One-time audio recovery. Preserve the user's configuration before changing it.
