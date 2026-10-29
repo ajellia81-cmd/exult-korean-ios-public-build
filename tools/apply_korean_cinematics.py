@@ -20,7 +20,8 @@ void Font::prepare_cinematic_ascii(){
  int neww=oldw,newh=oldh;
  struct Raster{KoreanPatchFont::Glyph glyph;int w,h;};
  std::map<unsigned,Raster> generated;
- for(unsigned code=32;code<=127;++code){
+ // A space has no cap-height: retain its installed/original advance.
+ for(unsigned code=33;code<=127;++code){
   const auto* original=native_face->get(code);
   auto* frame=font_shapes->get_frame(code);
   if(!original&&(!frame||!frame->is_rle()))continue;
@@ -80,7 +81,7 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 s+='\n'+prepare
 anchor='\tfonts[name] = font;'
 if s.count(anchor)!=2:raise RuntimeError("Cinematic font manager anchors")
-s=s.replace(anchor,'''    if(std::string(name)!="EXULT_AT_FONT")
+s=s.replace(anchor,'''    if(std::string(name)!="EXULT_AT_FONT"&&!(fname0.name=="<STATIC>/fonts.vga"&&(index==1||index==3||index==6||index==8||index==10)))
         font->prepare_cinematic_ascii();
 '''+anchor)
 p.write_text(s)
@@ -143,7 +144,7 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 anchor="\treturn load_internal(data, hlead, vlead);"
 if s.count(anchor)!=2:raise RuntimeError("Font load result anchors")
 s=s.replace(anchor,'''    const int result=load_internal(data,hlead,vlead);
-    if(index>=0&&index<=10&&index!=8&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
+    if(index>=0&&index<=10&&index!=1&&index!=3&&index!=6&&index!=8&&index!=10&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
         prepare_cinematic_ascii();
     return result;''')
 p.write_text(s)

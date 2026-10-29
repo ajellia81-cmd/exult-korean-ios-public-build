@@ -54,9 +54,13 @@ void exercise(bool native_ascii){
  // A second colour represents original outline/foreground separation.
  fixture_font.font_shapes->frames['!'].p[1]=1;
  const auto before=face->glyphs[0xb0a1];
+ const int space_before=fixture_font.native_width(" ",-1);
+ const int spaces_before=fixture_font.native_width("   ",-1);
  int oldw=face->bitmap_width,oldh=face->bitmap_height;
  fixture_font.prepare_cinematic_ascii();
  assert(fixture_font.native_ascii_override);
+ assert(fixture_font.native_width(" ",-1)==space_before);
+ assert(fixture_font.native_width("   ",-1)==spaces_before);
  const auto&after=face->glyphs[0xb0a1];
  assert(after.x==before.x&&after.y==before.y&&after.advance==before.advance);
  for(int y=0;y<oldh;++y)for(int x=0;x<oldw;++x)
@@ -117,3 +121,7 @@ print("PASS: cinematic punctuation cap-height/baseline/spacing/palette, native H
 
 assert 'index!=8' in font
 print("PASS: shared named/direct text routing, choice bullet included, ancient rune exceptions retained")
+
+for sign_index in (1,3,6,8,10):
+ assert f"index!={sign_index}" in font
+print("PASS: original sign/rune/embossed font slots excluded from general ASCII replacement; spaces retain original advances")
