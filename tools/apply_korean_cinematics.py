@@ -20,7 +20,7 @@ void Font::prepare_cinematic_ascii(){
  int neww=oldw,newh=oldh;
  struct Raster{KoreanPatchFont::Glyph glyph;int w,h;};
  std::map<unsigned,Raster> generated;
- for(unsigned code=32;code<127;++code){
+ for(unsigned code=32;code<=127;++code){
   const auto* original=native_face->get(code);
   auto* frame=font_shapes->get_frame(code);
   if(!original&&(!frame||!frame->is_rle()))continue;
@@ -51,6 +51,8 @@ void Font::prepare_cinematic_ascii(){
    g.pixels[size_t(y)*w+x]=c;
    g.left=std::min(g.left,x);g.top=std::min(g.top,y);g.right=std::max(g.right,x);g.bottom=std::max(g.bottom,y);
   }
+  if(code==127&&g.bottom>=g.top)
+   g.y=target_top+(target_height-(g.bottom-g.top+1))/2-g.top;
   if(g.right>=0)g.advance=std::max(g.advance,g.x+g.right+2);
   neww=std::max(neww,w);newh=std::max(newh,h);generated.emplace(code,std::move(raster));
  }
@@ -78,7 +80,7 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 s+='\n'+prepare
 anchor='\tfonts[name] = font;'
 if s.count(anchor)!=2:raise RuntimeError("Cinematic font manager anchors")
-s=s.replace(anchor,'''    if(std::string(name)=="GUARDIAN_FONT"||std::string(name)=="SIINTRO_FONT"||std::string(name)=="NORMAL_FONT")
+s=s.replace(anchor,'''    if(std::string(name)!="EXULT_AT_FONT")
         font->prepare_cinematic_ascii();
 '''+anchor)
 p.write_text(s)
@@ -135,13 +137,13 @@ s,n=re.subn(pattern,r'paint_si_intro_lines(sifont,ibuf,centerx,centery,centery+7
 if n<5:raise RuntimeError("SI paired subtitle anchors")
 p.write_text(s)
 
-# Conversation fonts are normally loaded directly, outside FontManager.
-# Prepare only slot 0; menu, button, book and save fonts keep their own metrics.
+# Directly loaded game text fonts share the same glyph metrics as named fonts.
+# Preserve slot 8 and EXULT_AT_FONT: their Latin codes represent ancient runes.
 p=Path("upstream/shapes/font.cc");s=p.read_text()
 anchor="\treturn load_internal(data, hlead, vlead);"
 if s.count(anchor)!=2:raise RuntimeError("Font load result anchors")
 s=s.replace(anchor,'''    const int result=load_internal(data,hlead,vlead);
-    if(index==0&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
+    if(index>=0&&index<=10&&index!=8&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
         prepare_cinematic_ascii();
     return result;''')
 p.write_text(s)

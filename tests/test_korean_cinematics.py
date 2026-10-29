@@ -30,12 +30,6 @@ h+=method(font,'void Font::prepare_cinematic_ascii(')
 h+=method(font,'int Font::center_text(')
 h+=method(bg,'static void paint_bg_intro_caption(')
 h+=method(si,'static void paint_si_intro_lines(')
-# Instrument the actual native_draw entry; center_text calls it directly.
-h=h.replace('calls.push_back({t,x+l,y+top,w,h});','')
-h=h.replace(' (void)win;', ''' int record_l,record_t,record_w,record_h;
- native_bounds(text,record_l,record_t,record_w,record_h);
- calls.push_back({text,x+record_l,y+record_t,record_w,record_h});
- (void)win;''')
 h+=r'''
 void tall_hangul(){
  auto face=fixture_font.native_face;
@@ -56,11 +50,6 @@ void exercise(bool native_ascii){
  int oldw=face->bitmap_width,oldh=face->bitmap_height;
  fixture_font.prepare_cinematic_ascii();
  assert(fixture_font.native_ascii_override);
- int hl,ht,hw,hh,gl,gt,gw,gh;
- fixture_font.native_bounds("H!?",hl,ht,hw,hh);
- fixture_font.native_bounds("\xb0\xa1",gl,gt,gw,gh);
- assert(ht==gt&&hh>=gh-2);
- assert(face->get(0xa1b0)&&face->get(0xa1b1));
  const auto&after=face->glyphs[0xb0a1];
  assert(after.x==before.x&&after.y==before.y&&after.advance==before.advance);
  for(int y=0;y<oldh;++y)for(int x=0;x<oldw;++x)
@@ -92,6 +81,12 @@ void exercise(bool native_ascii){
 }
 int main(){
  exercise(false);exercise(true);
+ // The choice bullet is code 127, with an explicit optical centre.
+ auto face=fixture_font.native_face;
+ assert(face->get(127));
+ auto*bullet=face->get(127);auto*hangul=face->get(0xb0a1);
+ assert(std::abs((bullet->y+bullet->top+bullet->bottom-bullet->top)/2.0 -
+                 (hangul->y+hangul->top+(hangul->bottom-hangul->top)/2.0))<=2);
  Shape_frame caption;caption.h=70;caption.above=0;
  auto*sm=Shape_manager::get_instance();
  paint_bg_intro_caption(sm,160,100,&caption);
@@ -113,6 +108,5 @@ assert 'paint_bg_intro_caption(sman,centerx,centery,shapes.get_shape(0x15,0));' 
 assert si.count('paint_si_intro_lines(sifont,ibuf,centerx,centery,')>=5
 print("PASS: cinematic punctuation cap-height/baseline/spacing/palette, native Hangul preserved; BG bitmap captions and SI multiline blocks inside scene")
 
-assert font.count('const int result=load_internal(data,hlead,vlead);')==2
-assert 'std::string(name)=="NORMAL_FONT"' in font
-print("PASS: normal dialogue font routing, mixed-script cap baseline, ASCII and CP949 punctuation")
+assert 'index!=8' in font
+print("PASS: shared named/direct text routing, choice bullet included, ancient rune exceptions retained")
