@@ -68,30 +68,7 @@ inline std::string korean_wrap_columns(const std::string& input,int width,Measur
  }
  flush();return out;
 }
-struct Korean_fit_raster{int width=0,height=0;std::vector<unsigned char> pixels;};
-inline Korean_fit_raster korean_fit_pixels(const std::vector<unsigned char>& src,int sw,int sh,int mw,int mh){
- Korean_fit_raster out;
- if(sw<=0||sh<=0||mw<=0||mh<=0||src.size()!=size_t(sw)*sh)return out;
- out.width=sw;out.height=sh;
- if(sw>mw||sh>mh){
-  if(static_cast<long long>(mw)*sh<=static_cast<long long>(mh)*sw){
-   out.width=mw;out.height=std::max(1,int(static_cast<long long>(sh)*mw/sw));
-  }else{
-   out.height=mh;out.width=std::max(1,int(static_cast<long long>(sw)*mh/sh));
-  }
- }
- out.pixels.assign(size_t(out.width)*out.height,255);
- for(int y=0;y<out.height;++y)for(int x=0;x<out.width;++x){
-  // Coverage sampling keeps thin black strokes when an information block shrinks.
-  int x0=x*sw/out.width,x1=((x+1)*sw+out.width-1)/out.width;
-  int y0=y*sh/out.height,y1=((y+1)*sh+out.height-1)/out.height;
-  auto& dst=out.pixels[size_t(y)*out.width+x];
-  for(int sy=y0;sy<std::min(y1,sh);++sy)for(int sx=x0;sx<std::min(x1,sw);++sx){
-   auto c=src[size_t(sy)*sw+sx];if(c!=255)dst=c;
-  }
- }
- return out;
-}
+
 '''
 s=s.replace('\n#endif','\n'+helpers+'\n#endif');p.write_text(s)
 
@@ -138,8 +115,8 @@ s=s.replace('menu->add_entry(entry);\n\t\tif (exultgame.has_mods()) {',
 s=s.replace('ypos += 45;','ypos += title_row_height;\n            title_row_height=45;',1)
 p.write_text(s)
 
-# Render all save information into the actual skin panel, not the larger region
-# above the portraits. Preserve all fields and scale only when the block overflows.
+# Draw each save-info line at its native pixel size inside the skin panel.
+# Date and time share one unambiguous ISO row; filenames and user names are never modified.
 p=Path("upstream/gumps/Newfile_gump.cc");s=p.read_text()
 s=s.replace('#include "touchui.h"','#include "touchui.h"\n#include "font.h"\n#include "ibuf8.h"\n#include "../shapes/korean_runtime_text.h"')
 s=re.sub(r'(Newfile_gump::infoh\s*=\s*)92;',r'\g<1>79;',s)
@@ -150,40 +127,55 @@ static void paint_save_information(const char* text,int x,int y,int width,int he
  if(!legacy_korean_font_available()){
   sm->paint_text_box(4,text,x,y,width,height);return;
  }
- Image_buffer8 sample(width,1024);sample.fill8(255);
- auto* previous=gw->push_render_target(&sample);
- sm->paint_text_box(4,text,0,0,width,1024);
- gw->pop_render_target(previous);
- int right=-1,bottom=-1;
- for(int sy=0;sy<1024;++sy)for(int sx=0;sx<width;++sx)
-  if(sample.get_pixel8(sx,sy)!=255){right=std::max(right,sx);bottom=std::max(bottom,sy);}
- if(bottom<0)return;
- const int sw=right+1,sh=bottom+1;
- std::vector<unsigned char> source(size_t(sw)*sh,255);
- for(int sy=0;sy<sh;++sy)for(int sx=0;sx<sw;++sx)
-  source[size_t(sy)*sw+sx]=sample.get_pixel8(sx,sy);
- const auto fitted=korean_fit_pixels(source,sw,sh,width,height);
+ auto face=sm->get_font(4);
+ struct Row{std::string text;int left=0,top=0,width=0,height=0;};
+ std::vector<Row> rows;
+ const std::string input=text?text:"";
+ size_t start=0;
+ while(start<input.size()){
+  const auto end=input.find('\n',start);
+  Row row;row.text=input.substr(start,end==std::string::npos?end:end-start);
+  start=end==std::string::npos?input.size():end+1;
+  if(row.text.empty())continue;
+  face->get_text_ink_bounds(row.text.c_str(),row.left,row.top,row.width,row.height);
+  if(row.width>width){
+   std::string prefix=row.text;
+   do{
+    size_t last=0;
+    for(size_t i=0;i<prefix.size();){last=i;i+=korean_text_pair(prefix.data()+i,prefix.size()-i)?2:1;}
+    prefix.resize(last);row.text=prefix+"...";
+    face->get_text_ink_bounds(row.text.c_str(),row.left,row.top,row.width,row.height);
+   }while(!prefix.empty()&&row.width>width);
+  }
+  rows.push_back(std::move(row));
+ }
+ // Preserve native pixels. Measure each complete line, including bearings,
+ // instead of resizing a raster or reflowing a mixed-script paragraph.
+ int ink_height=0;for(const auto& row:rows)ink_height+=std::max(1,row.height);
+ const int gap=rows.size()>1?std::max(0,(height-ink_height)/int(rows.size()-1)):0;
  auto* target=gw->get_win()->get_ib8();
  auto clip=target->SaveClip();
  auto r=clip.Rect().intersect(TileRect(x,y,width,height));
  target->set_clip(r.x,r.y,r.w,r.h);
- // The raw copy_transparent8 API treats palette 0 as transparent.
- // Our glyph raster uses 255 for transparency and 0 for opaque black.
- for(int yy=0;yy<fitted.height;++yy)for(int xx=0;xx<fitted.width;++xx){
-  const auto colour=fitted.pixels[size_t(yy)*fitted.width+xx];
-  if(colour!=255)target->put_pixel8(colour,x+xx,y+yy);
+ int pen=y;
+ for(const auto& row:rows){
+  if(pen+row.height>y+height)break;
+  face->paint_text(target,row.text.c_str(),x-row.left,pen-row.top);
+  pen+=std::max(1,row.height)+gap;
  }
 }
 '''
 s=s.replace('class Strings : public GumpStrings {',helper+'\nclass Strings : public GumpStrings {',1)
 s=s.replace('sman->paint_text_box(4, info, x + infox, y + infoy, infow, infoh);',
  'paint_save_information(info, x + infox, y + infoy, infow, infoh);')
-s=s.replace('"%s: %i%s %s %04i\\n"','"%s: %04i-%02i-%02i\\n"')
+old_date='"%s: %i%s %s %04i\\n"\n\t\t\t\t"%s: %02i:%02i"'
+if s.count(old_date)!=1:raise RuntimeError("Save date format anchor changed")
+s=s.replace(old_date,'"%04i-%02i-%02i %02i:%02i"',1)
 old='''Strings::SaveCount(), details->save_count, Strings::Date(), details->real_day,
 \t\t\t\tStrings::ordinal_numeral_suffix(details->real_day), Strings::month_Abbreviation(details->real_month - 1),
 \t\t\t\tdetails->real_year, Strings::Time(), details->real_hour, details->real_minute'''
-new='''Strings::SaveCount(), details->save_count, Strings::Date(), details->real_year,
-                details->real_month, details->real_day, Strings::Time(), details->real_hour, details->real_minute'''
+new='''Strings::SaveCount(), details->save_count, details->real_year,
+                details->real_month, details->real_day, details->real_hour, details->real_minute'''
 if old not in s:raise RuntimeError("Save date arguments changed")
 s=s.replace(old,new,1)
 for original,korean in {
