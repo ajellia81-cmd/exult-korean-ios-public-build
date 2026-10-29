@@ -604,8 +604,6 @@ bool Checkmark_button::activate(MouseButton button) {''')
 
 # Let a tap outside the notebook dismiss the native keyboard. Do not open it
 # just for reading: tapping a page still starts text entry through on_button.
-replace("gumps/Notebook_gump.cc",
-'''            PLACEHOLDER''', '''PLACEHOLDER''') if False else None
 p = Path("upstream/gumps/Notebook_gump.cc")
 text = p.read_text()
 start = text.index("Notebook_gump* Notebook_gump::create()")
@@ -632,3 +630,74 @@ text = text.replace(anchor, """#if defined(SDL_PLATFORM_IOS)
 #endif
 """ + anchor)
 p.write_text(text)
+
+# Install a common native keyboard-dismiss control, independent of gump type.
+replace("ios/ios_utils.mm", "void KoreanIOSDiagnostics() {", "static void InstallExultKeyboardDismissControl();\nvoid KoreanIOSDiagnostics() {\n    InstallExultKeyboardDismissControl();")
+p = Path("upstream/ios/ios_utils.mm")
+p.write_text(p.read_text() + r'''
+#import <SDL3/SDL.h>
+
+// One native dismissal control for every SDL text-input screen.
+@interface ExultKeyboardDismissControl : NSObject
+@property(nonatomic, strong) UIButton* button;
+- (void)keyboardFrame:(NSNotification*)notification;
+- (void)keyboardHidden:(NSNotification*)notification;
+- (void)dismissKeyboard;
+@end
+
+@implementation ExultKeyboardDismissControl
+- (void)keyboardFrame:(NSNotification*)notification {
+    SDL_Window* sdlWindow = SDL_GetKeyboardFocus();
+    if (!sdlWindow) return;
+    UIWindow* window = (__bridge UIWindow*)SDL_GetPointerProperty(
+        SDL_GetWindowProperties(sdlWindow), SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER, nullptr);
+    if (!window) return;
+    CGRect frame = [notification.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    CGRect keyboard = [window convertRect:frame fromWindow:nil];
+    CGRect overlap = CGRectIntersection(window.bounds, keyboard);
+    if (CGRectIsNull(overlap) || overlap.size.height <= 0) {
+        [self.button removeFromSuperview];
+        return;
+    }
+    if (!self.button) {
+        self.button = [UIButton buttonWithType:UIButtonTypeSystem];
+        [self.button setTitle:@"키보드 내리기 ⌄" forState:UIControlStateNormal];
+        [self.button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        self.button.backgroundColor = [UIColor colorWithWhite:0.12 alpha:0.92];
+        self.button.layer.cornerRadius = 10;
+        self.button.accessibilityLabel = @"키보드 내리기";
+        [self.button addTarget:self action:@selector(dismissKeyboard) forControlEvents:UIControlEventTouchUpInside];
+    }
+    const CGFloat width = 160, height = 44;
+    self.button.frame = CGRectMake(
+        MAX(window.safeAreaInsets.left, window.bounds.size.width - window.safeAreaInsets.right - width - 8),
+        MAX(window.safeAreaInsets.top, overlap.origin.y - height - 4), width, height);
+    [window addSubview:self.button];
+    [window bringSubviewToFront:self.button];
+}
+- (void)keyboardHidden:(NSNotification*)notification {
+    (void)notification;
+    [self.button removeFromSuperview];
+}
+- (void)dismissKeyboard {
+    // Run on SDL's main thread and update its text-input state as well as UIKit.
+    SDL_RunOnMainThread([](void*) {
+        SDL_Window* window = SDL_GetKeyboardFocus();
+        if (window && SDL_TextInputActive(window)) SDL_StopTextInput(window);
+    }, nullptr, false);
+}
+@end
+
+static void InstallExultKeyboardDismissControl() {
+    static ExultKeyboardDismissControl* control = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        control = [[ExultKeyboardDismissControl alloc] init];
+        NSNotificationCenter* center = NSNotificationCenter.defaultCenter;
+        [center addObserver:control selector:@selector(keyboardFrame:)
+                       name:UIKeyboardWillChangeFrameNotification object:nil];
+        [center addObserver:control selector:@selector(keyboardHidden:)
+                       name:UIKeyboardWillHideNotification object:nil];
+    });
+}
+''')
