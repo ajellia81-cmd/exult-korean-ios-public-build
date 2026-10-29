@@ -74,6 +74,7 @@ struct Font {
  void native_bounds(const char*,int&,int&,int&,int&);
 
  std::unique_ptr<Shape_file> font_shapes=std::make_unique<Shape_file>();
+ bool native_ascii_override=false;
  bool legacy_korean_layout_override=false;
  int highest=10,lowest=3,hor_lead=-1,ver_lead=0;
  int paint_text(Image_buffer8*,const char*,int,int,unsigned char* =nullptr);
