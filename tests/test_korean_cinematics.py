@@ -30,6 +30,13 @@ h+=method(font,'void Font::prepare_cinematic_ascii(')
 h+=method(font,'int Font::center_text(')
 h+=method(bg,'static void paint_bg_intro_caption(')
 h+=method(si,'static void paint_si_intro_lines(')
+# Capture native_draw, which centered text invokes without paint_text.
+h=h.replace('calls.push_back({t,x+l,y+top,w,h});','')
+assert ' (void)win;' in h
+h=h.replace(' (void)win;', ''' int record_l,record_t,record_w,record_h;
+ native_bounds(text,record_l,record_t,record_w,record_h);
+ calls.push_back({text,x+record_l,y+record_t,record_w,record_h});
+ (void)win;''')
 h+=r'''
 void tall_hangul(){
  auto face=fixture_font.native_face;
