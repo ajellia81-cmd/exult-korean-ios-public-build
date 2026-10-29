@@ -1053,3 +1053,68 @@ text = text.replace("TileRect Gump::get_dirty() {\n\tTileRect rect = get_rect();
     TileRect rect = get_rect();
     for (auto* elem : elems) if (elem) rect = rect.add(elem->get_rect());""",1)
 p.write_text(text)
+
+
+# The margin is font-dependent: some runes have a negative left bearing.
+replace("shapes/font.h", "\tvoid get_text_ink_bounds(",
+        "\tint get_text_edge_padding(const char* text);\n\tvoid get_text_ink_bounds(")
+p = Path("upstream/shapes/font.cc")
+text = p.read_text()
+text += r'''
+int Font::get_text_edge_padding(const char* text) {
+    int padding = 0;
+    if (!text) return padding;
+    Korean_layout_scope scope(legacy_korean_layout_override, contains_legacy_korean(text, -1));
+    for (int i = 0; text[i];) {
+        const int bytes = korean_font.is_pair(text + i, 2) ? 2 : 1;
+        char token[3] = {text[i], bytes == 2 ? text[i + 1] : '\0', '\0'};
+        int l, t, w, h;
+        get_text_ink_bounds(token, l, t, w, h);
+        if (w > 0) {
+            padding = std::max(padding, -l);
+            padding = std::max(padding, l + w - get_text_width(token));
+        }
+        i += bytes;
+    }
+    return padding;
+}
+'''
+text = text.replace("std::min(2, std::max(0, (w - 1) / 2))",
+                    "std::min(get_text_edge_padding(text), std::max(0, (w - 1) / 2))")
+# Cursor hit-testing must use the same inset and long-token split as painting.
+a = text.index("int Font::find_cursor(")
+brace = text.index("{", a)
+insert = """
+    const int edge = std::min(get_text_edge_padding(text), std::max(0, (w - 1) / 2));
+    x += edge; w -= 2 * edge;
+"""
+text = text[:brace+1] + insert + text[brace+1:]
+# Share the exact bounded-prefix decision with the ordinary text-box painter.
+a = text.index("int Font::paint_text_box(")
+start = text.index("        if (legacy_korean_layout_override && width - hor_lead > w)", a)
+end = text.index("\n\t\tif (curx + width - hor_lead > endx)", start)
+split = text[start:end]
+a = text.index("int Font::find_cursor(")
+b = text.index("\t\tif (curx + width - hor_lead > endx)", a)
+text = text[:b] + split + "\n" + text[b:]
+a = text.index("int Font::paint_text_box_fixedwidth(")
+b = text.index("\t\tif (curx + width - hor_lead > endx)", a)
+fixed = split.replace("get_text_width(text, static_cast<int>(next - text))",
+    "korean_fixed_text_width(text, static_cast<int>(next - text), char_width, font_shapes.get(), legacy_korean_layout_override, hor_lead)")
+fixed = fixed.replace("get_text_width(text, static_cast<int>(ewrd - text))",
+    "korean_fixed_text_width(text, static_cast<int>(ewrd - text), char_width, font_shapes.get(), legacy_korean_layout_override, hor_lead)")
+# Fixed-width width must be mutable when a token is split.
+part = text[a:b].replace("const int   width = korean_fixed_text_width", "int         width = korean_fixed_text_width")
+text = text[:a] + part + fixed + "\n" + text[b:]
+p.write_text(text)
+
+# Fit the complete inscription vertically as well as horizontally.
+p = Path("upstream/gumps/Sign_gump.cc")
+text = p.read_text()
+anchor = "\t// Get space between lines."
+text = text.replace(anchor, """    const int slot = std::max(1, (object_area.h - 8) / std::max(1, num_lines));
+    lheight = std::min(lheight, slot);
+""" + anchor,1)
+text = text.replace("const int dw = std::min(iw, available);",
+    "const int dw = std::max(1, std::min(std::min(iw, available), iw * slot / ih));")
+p.write_text(text)

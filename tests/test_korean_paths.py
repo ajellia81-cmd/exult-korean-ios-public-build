@@ -71,6 +71,7 @@ struct Font {
  int get_text_width(const char*,int);
  void get_text_box_dims(const char*,int&,int&,int=0);
  int find_xcursor(const char*,int,int);
+ int get_text_edge_padding(const char*);
  void get_text_ink_bounds(const char*,int&,int&,int&,int&);
  int get_text_height();
  int get_text_height(const char*,int=-1);
@@ -83,6 +84,7 @@ production=s[a:b]
 for name in ["int Font::paint_text(","int Font::paint_text_fixedwidth(","int Font::get_text_width(","void Font::get_text_box_dims(","int Font::find_xcursor(","int Font::get_text_height(","int Font::get_text_baseline("]:
     production+="\n"+"\n".join(overloads(name))
 production += "\n" + function("void Font::get_text_ink_bounds(")
+production += "\n" + function("int Font::get_text_edge_padding(")
 tests=r'''
 int main(){
  constexpr int gw=11,gh=11,stride=2,size=stride*gh;
