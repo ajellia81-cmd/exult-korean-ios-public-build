@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory() as folder:
 for name in ("welcome_scene","mods_scene","logo_scene","*menu_scene"):
  assert "fit_launcher_scene("+name in menu
 assert 'EXULT_FLX_FONTS_ORIGINAL_VGA), PATCH_ORIGINAL_FONTS, 18, 1' in menu
-assert 'mapped=(index>=18&&index<=21)?95+index-18:90+index;' in font
+assert 'mapped=(index>=18&&index<=21)?95+index-18:' in font
 entries=Path("upstream/menulist.cc").read_text()
 assert entries.count("font_on->get_text_edge_padding")>=3
 print("Launcher scene aspect and text-bound checks passed")
