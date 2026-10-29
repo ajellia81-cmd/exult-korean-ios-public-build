@@ -67,6 +67,10 @@ void Font::prepare_cinematic_ascii(){
   native_face->glyphs[entry.first]=std::move(entry.second.glyph);
  }
  native_face->bitmap_width=neww;native_face->bitmap_height=newh;
+ // CP949 curly quotes should share the prepared quote metrics as well.
+ for(unsigned code:{0xa1b0u,0xa1b1u})if(!native_face->get(code)){
+  const auto* quote=native_face->get('"');if(quote)native_face->glyphs[code]=*quote;
+ }
  native_ascii_override=true;
 }
 '''
@@ -74,7 +78,7 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 s+='\n'+prepare
 anchor='\tfonts[name] = font;'
 if s.count(anchor)!=2:raise RuntimeError("Cinematic font manager anchors")
-s=s.replace(anchor,'''    if(std::string(name)=="GUARDIAN_FONT"||std::string(name)=="SIINTRO_FONT")
+s=s.replace(anchor,'''    if(std::string(name)=="GUARDIAN_FONT"||std::string(name)=="SIINTRO_FONT"||std::string(name)=="NORMAL_FONT")
         font->prepare_cinematic_ascii();
 '''+anchor)
 p.write_text(s)
@@ -129,4 +133,15 @@ s=s[:a]+helper+'\n'+s[a:]
 pattern=r'sifont->center_text\(ibuf, centerx, centery \+ 74 \+ vlead, (get_text_msg\([^\n]+?\))\);\s*sifont->center_text\(ibuf, centerx, centery \+ 87 \+ vlead, (get_text_msg\([^\n]+?\))\);'
 s,n=re.subn(pattern,r'paint_si_intro_lines(sifont,ibuf,centerx,centery,centery+74+vlead,{\1,\2});',s)
 if n<5:raise RuntimeError("SI paired subtitle anchors")
+p.write_text(s)
+
+# Conversation fonts are normally loaded directly, outside FontManager.
+# Prepare only slot 0; menu, button, book and save fonts keep their own metrics.
+p=Path("upstream/shapes/font.cc");s=p.read_text()
+anchor="\treturn load_internal(data, hlead, vlead);"
+if s.count(anchor)!=2:raise RuntimeError("Font load result anchors")
+s=s.replace(anchor,'''    const int result=load_internal(data,hlead,vlead);
+    if(index==0&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
+        prepare_cinematic_ascii();
+    return result;''')
 p.write_text(s)
