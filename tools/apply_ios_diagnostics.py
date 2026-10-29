@@ -754,3 +754,22 @@ text = text.replace(anchor, anchor + '\n    static const char* Cancel() {\n'
     '        if (legacy_korean_font_available()) return "' + cancel + '";\n'
     '        return GumpStrings::Cancel();\n    }')
 p.write_text(text)
+
+# Clamp the real union of translated button rectangles, rather than assuming
+# every menu is 100 pixels wide and each button has the nominal height.
+p = Path("upstream/gumps/ItemMenu_gump.cc")
+text = p.read_text()
+start = text.index("void Itemmenu_gump::fix_position(int num_elements) {")
+end = text.index("\nItemmenu_gump::Itemmenu_gump(", start)
+text = text[:start] + """void Itemmenu_gump::fix_position(int num_elements) {
+    (void)num_elements;
+    const int w = Game_window::get_instance()->get_width();
+    const int h = Game_window::get_instance()->get_height();
+    const TileRect bounds = get_rect();
+    const int max_x = w > bounds.w ? w - bounds.w : 0;
+    const int max_y = h > bounds.h ? h - bounds.h : 0;
+    x += clamp(bounds.x, 0, max_x) - bounds.x;
+    y += clamp(bounds.y, 0, max_y) - bounds.y;
+}
+""" + text[end:]
+p.write_text(text)
