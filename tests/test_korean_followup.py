@@ -217,7 +217,7 @@ struct Details{int game_day=0,game_hour=9,game_minute=54,save_count=17,real_year
 void check_panel(const std::string&text,int expected){
  auto*g=Game_window::get_instance();
  std::fill(g->target.p.begin(),g->target.p.end(),42);fixture_font.calls.clear();
- paint_save_information(text.c_str(),120,40,92,72);
+ paint_save_information(text.c_str(),120,40,92,79); // Caller still passes the historical outer size.
  assert(int(fixture_font.calls.size())==expected);
  int bottom=40;
  for(const auto&c:fixture_font.calls){
