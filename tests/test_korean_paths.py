@@ -41,7 +41,6 @@ prefix=prefix.replace(" static Image_buffer8* screen;",''' static Image_buffer8*
  }
 ''')
 prefix += pathlib.Path("tools/korean_patch_font.h").read_text()
-prefix += "\nbool korean_patch_pack_present(){return false;}\n"
 prefix+=r'''
 struct Shape_file {
  Shape_frame ascii; int high_requests=0;

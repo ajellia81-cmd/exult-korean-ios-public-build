@@ -12,6 +12,7 @@ prefix = r'''
 #include <string>
 #include <vector>
 using std::size_t;
+bool korean_patch_pack_present(){return false;}
 #define PATCH_KOREAN_FONT "patch"
 #define STATIC_KOREAN_FONT "static"
 #define KOREAN_FONT "data"

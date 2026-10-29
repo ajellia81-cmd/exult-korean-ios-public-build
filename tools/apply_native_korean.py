@@ -35,13 +35,14 @@ static std::shared_ptr<KoreanPatchFont> load_korean_patch_face(const std::string
     if(source=="<STATIC>/fonts.vga")mapped=index;
     else if(source=="<STATIC>/mainshp.flx")mapped=10+index;
     else if(source=="<STATIC>/intro.dat"||source=="<STATIC>/endgame.dat")mapped=20+index;
-    else if(source=="<DATA>/exult.flx")mapped=90+index;
+    else if(source.find("exult.flx")!=std::string::npos)
+        mapped=(index>=18&&index<=21)?95+index-18:90+index;
     if(mapped<0)return {};
     const char* game=Game::get_game_type()==BLACK_GATE?"bg":
                      Game::get_game_type()==SERPENT_ISLE?"si":"ex";
-    for(const auto* root:{"<CONFIG>/patch/","<PATCH>/"}) {
+    for(const auto* suffix:{game,"ex"}) for(const auto* root:{"<CONFIG>/patch/","<PATCH>/"}) {
         if(std::string(root)=="<PATCH>/"&&!is_system_path_defined("<PATCH>"))continue;
-        std::string name="font"+std::to_string(mapped)+game+".fnt";
+        std::string name="font"+std::to_string(mapped)+suffix+".fnt";
         for(int upper=0;upper<2;++upper){
             if(upper)for(auto& c:name)c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
             const auto path=std::string(root)+name;
@@ -242,4 +243,16 @@ for signature in ("int Font::paint_text_box(", "int Font::paint_text_box_fixedwi
         if(it<0){y-=it;h=std::max(0,h+it);}
     }
 """+text[b:]
+p.write_text(text)
+
+# Text buttons use the patch's black UI face rather than a dialogue face.
+edit("shapes/font.h", "class Font {\nprivate:", "class Font {\n    friend class FontManager;\nprivate:")
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+needle="\tfonts[name] = font;"
+if text.count(needle)!=2:raise RuntimeError("FontManager routing anchors changed")
+text=text.replace(needle,'''    if(std::string(name)=="SMALL_BLACK_FONT") {
+        auto face=load_korean_patch_face("<STATIC>/fonts.vga",2);
+        if(face)font->native_face=std::move(face);
+    }
+'''+needle)
 p.write_text(text)
