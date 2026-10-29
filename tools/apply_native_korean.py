@@ -286,3 +286,39 @@ text=text.replace(anchor,anchor+'''
     if(U7exists("<CONFIG>/patch/font0bg.fnt")||U7exists("<CONFIG>/patch/FONT0BG.FNT"))
         return original;''',1)
 p.write_text(text)
+
+
+# The pack omits curly quotes and ellipsis from its bitmap table. Use explicit
+# punctuation fallbacks rather than indexing a high byte as an ASCII frame.
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+text=text.replace("const bool style=native_style(text,length);int width=0;",
+ """const bool style=native_style(text,length);
+ Korean_layout_scope context(legacy_korean_layout_override,style);int width=0;""")
+text=text.replace("const bool style=native_style(text,length);const int start=x;",
+ """const bool style=native_style(text,length);
+ Korean_layout_scope context(legacy_korean_layout_override,style);const int start=x;""")
+text=text.replace("const int length=int(std::strlen(text));const bool style=native_style(text,length);",
+ """const int length=int(std::strlen(text));const bool style=native_style(text,length);
+ Korean_layout_scope context(legacy_korean_layout_override,style);""")
+# Keep the source codepoint for native lookup; normalize only missing glyphs.
+text=text.replace("font_shapes->get_frame(n==2?'?':code)",
+ "font_shapes->get_frame(code==0xa1b0||code==0xa1b1?'\"':code==0xa1a6?'.':n==2?'?':code)")
+p.write_text(text)
+
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+for signature,extra in [
+ ("int Font::native_width(",'''  if(code==0xa1a6&&!glyph){width+=native_width("...",3,cell);i+=n;continue;}
+'''),
+ ("int Font::native_draw(",'''  if(code==0xa1a6&&!glyph){x+=native_draw(win,"...",3,x,y,trans,cell);i+=n;continue;}
+'''),
+ ("void Font::native_bounds(",'''  if(code==0xa1a6&&!glyph){
+   int ll,tt,ww,hh;native_bounds("...",ll,tt,ww,hh);
+   if(ww&&hh)include(pen+ll,tt,pen+ll+ww-1,tt+hh-1);
+   pen+=native_width("...",3);i+=n;continue;
+  }
+''')]:
+ a=text.index(signature)
+ b=text.index("auto* glyph=(n==2||style)?native_face->get(code):nullptr;",a)
+ b=text.index(";",b)+1
+ text=text[:b]+"\n"+extra+text[b:]
+p.write_text(text)

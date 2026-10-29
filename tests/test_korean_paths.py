@@ -41,6 +41,12 @@ prefix=prefix.replace(" static Image_buffer8* screen;",''' static Image_buffer8*
  }
 ''')
 prefix += pathlib.Path("tools/korean_patch_font.h").read_text()
+prefix=prefix.replace("pixels; int w,h;", "pixels; int w,h; int ox=0,oy=0;")
+prefix=prefix.replace("int h_,int,int,bool):", "int h_,int ox_,int oy_,bool):")
+prefix=prefix.replace("w(w_),h(h_){}", "w(w_),h(h_),ox(ox_),oy(oy_){}")
+prefix=prefix.replace("x+c,y+r", "x+c-ox,y+r-oy")
+prefix=prefix.replace("int get_xleft(){return 0;} int get_yabove(){return 0;}",
+                      "int get_xleft(){return ox;} int get_yabove(){return oy;}")
 prefix+=r'''
 struct Shape_file {
  Shape_frame ascii; int high_requests=0;
@@ -194,6 +200,30 @@ int main(){
    assert(f.get_text_baseline()==highest);
    assert(f.get_text_baseline(menu)==highest);
   }
+ }
+
+
+ {
+  std::vector<unsigned char> native={0x45,0x33,0x22,0x11,12,12,4,4,0,1,0,0,2,0};
+  native.insert(native.end(),{0x41,0x81,255,254,12,0x41,0,0,0,3});
+  native.insert(native.end(),{0x60,0x30,0x0c,0x03,0x60,0x30,0x0c,0x03});
+  f.native_face=std::make_shared<KoreanPatchFont>();
+  assert(f.native_face->load(native));
+  const char mixed[]="\x81\x41" "A";
+  assert(f.get_text_width(mixed)==15);
+  assert(f.get_text_width(mixed,2)==12);
+  image.fill8(7);assert(f.paint_text(&image,mixed,10,10)==15);
+  assert(image.pixels[8*64+9]==1); // Negative top/left bearing.
+  assert(image.pixels[9*64+10]==0); // Opaque black outline, not transparency.
+  int l,t,w,h;f.get_text_ink_bounds(mixed,l,t,w,h);
+  for(int yy=0;yy<32;++yy)for(int xx=0;xx<40;++xx)
+   if(image.pixels[yy*64+xx]!=7)
+    assert(xx>=10+l&&xx<10+l+w&&yy>=10+t&&yy<10+t+h);
+  assert(f.find_xcursor(mixed,3,11)==0);
+  assert(f.find_xcursor(mixed,3,12)==2);
+  assert(f.get_text_width("\xa1\xa6")==3*f.get_text_width("."));
+  assert(f.get_text_width("\xa1\xb0")==f.get_text_width("\""));
+  f.native_face.reset();
  }
 
  std::cout<<"PASS: "<<checked<<" glyph indices, four paint paths, two width paths, multiline dimensions, fixed-width layout, and cursor boundaries\n";
