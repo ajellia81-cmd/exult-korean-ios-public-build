@@ -363,3 +363,17 @@ text=text[:a]+'''static bool korean_patch_pack_present() {
     return present;
 }'''+text[b:]
 p.write_text(text)
+
+
+# Reading a sign uppercases Latin runes; never uppercase the ASCII-valued
+# trailing byte of a CP949 extension syllable.
+p=Path("upstream/gumps/Sign_gump.cc");text=p.read_text()
+text=text.replace('#include "font.h"','#include "font.h"\n#include "korean_patch_font.h"',1)
+anchor="\t\tfor (const auto& ch : txt) {"
+if text.count(anchor)!=1:raise RuntimeError("CP949 sign-case anchor changed")
+text=text.replace(anchor,'''        for(size_t i=0;i<txt.size();++i) {
+            if(KoreanPatchFont::pair(txt.data()+i,static_cast<int>(txt.size()-i))) {
+                lines[line].append(txt,i,2);++i;continue;
+            }
+            const auto ch=txt[i];''',1)
+p.write_text(text)
