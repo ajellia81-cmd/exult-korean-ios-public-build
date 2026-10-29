@@ -30,6 +30,7 @@ int font_route(const std::string& source,int index){
 harness=preamble+route+r"""
 struct TileRect{
  int x,y,w,h;
+ TileRect(int xx=0,int yy=0,int ww=0,int hh=0):x(xx),y(yy),w(ww),h(hh){}
  bool has_point(int xx,int yy)const{return xx>=x&&yy>=y&&xx<x+w&&yy<y+h;}
  TileRect add(TileRect r)const{
   int l=std::min(x,r.x),t=std::min(y,r.y),rr=std::max(x+w,r.x+r.w),bb=std::max(y+h,r.y+r.h);
