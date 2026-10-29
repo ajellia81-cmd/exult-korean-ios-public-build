@@ -64,6 +64,7 @@ jobs:
           python3 tools/apply_native_korean.py
           python3 tools/apply_korean_completion.py
           python3 tools/apply_korean_followup.py
+          python3 tools/apply_korean_cinematics.py
 
       - name: Test production Korean font loader with synthetic data
         run: |
@@ -77,6 +78,7 @@ jobs:
           python3 tests/test_startup_regressions.py
           python3 tests/test_korean_completion.py
           python3 tests/test_korean_followup.py
+          python3 tests/test_korean_cinematics.py
 
       - name: Upload encoding audit report
         uses: actions/upload-artifact@v4
