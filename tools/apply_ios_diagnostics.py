@@ -560,11 +560,11 @@ static void fit_launcher_scene(Scene_view& scene, int w, int h) {
     auto* gwin = Game_window::get_instance();
     auto* win = gwin->get_win();
     const int dw = win->get_display_width(), dh = win->get_display_height();
-    // Integer arithmetic preserves the scene ratio without cropping.
-    int width = dw, height = static_cast<int>(static_cast<long long>(dw) * h / w);
+    // DOS 320x200 art targets a 4:3 display (non-square source pixels).
+    int width = dw, height = static_cast<int>(static_cast<long long>(dw) * 3 / 4);
     if (height > dh) {
         height = dh;
-        width = static_cast<int>(static_cast<long long>(dh) * w / h);
+        width = static_cast<int>(static_cast<long long>(dh) * 4 / 3);
     }
     gwin->layer_set_dest(scene.get_handle(), (dw - width) / 2, (dh - height) / 2, width, height);
 }
@@ -711,7 +711,7 @@ static void InstallExultKeyboardDismissControl() {
 ''')
 
 # Every iOS takeover scene (BG/SI logos, intro, title, character creation,
-# credits and loading scenes) must fit its own source ratio, never stretch.
+# credits and loading scenes) use the original DOS 4:3 display ratio.
 # Layer inverse transforms already use this destination for touch mapping.
 replace("scene_layer.h",
 '''\t\t\tgwin->layer_set_opaque(handle, true);''',
@@ -719,10 +719,10 @@ replace("scene_layer.h",
 #ifdef SDL_PLATFORM_IOS
             const int dw = iwin->get_display_width(), dh = iwin->get_display_height();
             int width = dw;
-            int height = static_cast<int>(static_cast<long long>(dw) * scene_h / scene_w);
+            int height = static_cast<int>(static_cast<long long>(dw) * 3 / 4);
             if (height > dh) {
                 height = dh;
-                width = static_cast<int>(static_cast<long long>(dh) * scene_w / scene_h);
+                width = static_cast<int>(static_cast<long long>(dh) * 4 / 3);
             }
             gwin->layer_set_dest(handle, (dw - width) / 2, (dh - height) / 2, width, height);
 #endif''')
