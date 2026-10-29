@@ -287,3 +287,9 @@ assert 'text=korean_wrap_columns(text,available,' in menu
 assert 'std::string localcopy = text;' in menu
 assert 'x1=std::clamp(x1,column_left,' in menu
 print("PASS: reviewed translations and launcher constraints retained; save raster scaling removed")
+
+# Both games share the compact save-info face. Its original native ASCII metrics
+# must survive general cinematic/dialogue cap-height preparation.
+assert 'index!=4' in font
+assert 'std::string(name)!="TINY_BLACK_FONT"' in font
+print("PASS: compact save-info face is exempt from general ASCII enlargement in BG and SI")

@@ -81,7 +81,7 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 s+='\n'+prepare
 anchor='\tfonts[name] = font;'
 if s.count(anchor)!=2:raise RuntimeError("Cinematic font manager anchors")
-s=s.replace(anchor,'''    if(std::string(name)!="EXULT_AT_FONT"&&!(fname0.name=="<STATIC>/fonts.vga"&&(index==1||index==3||index==6||index==8||index==10)))
+s=s.replace(anchor,'''    if(std::string(name)!="EXULT_AT_FONT"&&std::string(name)!="TINY_BLACK_FONT"&&!(fname0.name=="<STATIC>/fonts.vga"&&(index==1||index==3||index==4||index==6||index==8||index==10)))
         font->prepare_cinematic_ascii();
 '''+anchor)
 p.write_text(s)
@@ -144,7 +144,10 @@ p=Path("upstream/shapes/font.cc");s=p.read_text()
 anchor="\treturn load_internal(data, hlead, vlead);"
 if s.count(anchor)!=2:raise RuntimeError("Font load result anchors")
 s=s.replace(anchor,'''    const int result=load_internal(data,hlead,vlead);
-    if(index>=0&&index<=10&&index!=1&&index!=3&&index!=6&&index!=8&&index!=10&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
+    if(index>=0&&index<=10&&index!=1&&index!=3&&index!=4&&index!=6&&index!=8&&index!=10&&(fname0.name=="<STATIC>/fonts.vga"||fname0.name.find("exult.flx")!=std::string::npos))
         prepare_cinematic_ascii();
     return result;''')
 p.write_text(s)
+
+# Slot 4 and TINY_BLACK_FONT are compact UI text, including save metadata.
+# Preserve their installed ASCII advances; normal dates and filenames fit at native size.
