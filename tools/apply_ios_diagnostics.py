@@ -547,7 +547,7 @@ replace("gumps/Gump_manager.cc", "bool Gump_manager::remove_gump(Gump* gump) {",
 # itself so its layer and inverse input mapping share the same new origin.
 replace("gumps/Notebook_gump.cc", "\tset_pos(5, -2);",
 '''#if defined(SDL_PLATFORM_IOS)
-    set_pos(32, 4);
+    set_pos(64, 8);
 #else
     set_pos(5, -2);
 #endif''')
