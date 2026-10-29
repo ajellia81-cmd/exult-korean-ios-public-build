@@ -72,6 +72,7 @@ jobs:
           python3 tests/test_ios_lifecycle.py
           python3 tests/test_menu_layers.py
           python3 tests/test_native_korean.py
+          python3 tests/test_startup_regressions.py
 
       - name: Upload encoding audit report
         uses: actions/upload-artifact@v4

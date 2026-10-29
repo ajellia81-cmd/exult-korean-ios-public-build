@@ -377,3 +377,92 @@ text=text.replace(anchor,'''        for(size_t i=0;i<txt.size();++i) {
             }
             const auto ch=txt[i];''',1)
 p.write_text(text)
+
+
+# Original-format BG initial data can also live in PATCH. An Exult save has
+# exult.ver; the original Flex does not. Decide after restoration (old version
+# files are removed there), before the engine emits newgame.ver.
+edit("gamewin.cc", "\t\t\trestore_gamedat(PATCH_INITGAME);", '''
+            restore_gamedat(PATCH_INITGAME);
+            if (!U7exists(GEXULTVER)) {
+                Game::set_new_game();
+                std::cout << "Patched initial data: original U7 format" << std::endl;
+            } else {
+                std::cout << "Patched initial data: Exult save format" << std::endl;
+            }''')
+
+# Embedded modern font collections use different indices than the old files.
+# Route named UI fonts explicitly, leaving the installed bitmap design intact.
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+anchor='\tfonts[name] = font;'
+if text.count(anchor)!=2:raise RuntimeError("Named font routing anchors changed")
+routing='''    const std::string native_name(name);
+    std::shared_ptr<KoreanPatchFont> named_face;
+    if(native_name=="MENU_FONT")
+        named_face=load_korean_patch_face("<STATIC>/mainshp.flx",9);
+    else if(native_name=="NORMAL_FONT"||native_name=="EXULT_END_FONT")
+        named_face=load_korean_patch_face("<STATIC>/fonts.vga",0);
+    else if(native_name=="TINY_BLACK_FONT")
+        named_face=load_korean_patch_face("<STATIC>/fonts.vga",4);
+    else if(native_name=="SIINTRO_FONT")
+        named_face=load_korean_patch_face("<STATIC>/intro.dat",14);
+    if(named_face)font->native_face=std::move(named_face);
+'''
+text=text.replace(anchor,routing+anchor);p.write_text(text)
+
+# The no-game screen precedes the regular launcher scene. Give it its own
+# native-aspect scene and wrap measured text, rather than fixed 10px rows.
+p=Path("upstream/exultmenu.cc");text=p.read_text()
+anchor='\tif (!gamemanager->get_game_count()) {'
+if text.count(anchor)!=1:raise RuntimeError("Welcome scene anchor changed")
+text=text.replace(anchor,anchor+'''
+        int welcome_x=0,welcome_y=0;
+        Scene_view welcome_scene(welcome_x,welcome_y,centerx,centery,ibuf,true,320,200);
+        fit_launcher_scene(welcome_scene,320,200);
+''',1)
+a=text.index('\t\tconst int total_lines = sizeof(message)')
+b=text.index('\n\t\tgpal->apply();',a)
+text=text[:a]+'''        std::string welcome;
+        for(const char* line:message) {
+            if(!welcome.empty())welcome+='\\n';
+            welcome+=line;
+        }
+        font->paint_text_box(ibuf,welcome.c_str(),centerx-150,centery-90,
+                             300,180,2,false,true);
+'''+text[b:]
+p.write_text(text)
+
+# Audio recovery once after the old diagnostic build disabled OGG playback.
+# Only select digital playback once an actual music pack is installed.
+p=Path("upstream/audio/Audio.cc");text=p.read_text()
+anchor='\tconfig->value("config/audio/enabled", s, "yes");'
+if text.count(anchor)!=1:raise RuntimeError("Audio recovery anchor changed")
+text=text.replace(anchor,'''
+#ifdef SDL_PLATFORM_IOS
+    std::string recovery;
+    config->value("config/audio/korean_audio_repair_v2",recovery,"no");
+    const bool music_pack=U7exists("<DATA>/music/00bg.ogg")
+        ||U7exists("<DATA>/music/si01.ogg")||U7exists("<DATA>/music/01mus.ogg");
+    if(recovery!="yes"&&music_pack) {
+        config->set("config/audio/enabled","yes",false);
+        config->set("config/audio/midi/enabled","yes",false);
+        config->set("config/audio/effects/enabled","yes",false);
+        config->set("config/audio/midi/use_oggs","yes",false);
+        config->set("config/audio/korean_audio_repair_v2","yes",false);
+        std::cerr<<"Audio recovery v2: installed digital music enabled once"<<std::endl;
+    }
+#endif
+'''+anchor,1)
+# Show which expected packs are absent without implying audio-device failure.
+anchor='\tconst Exult_Game game = Game::get_game_type();'
+# Other methods use this line too; restrict the replacement to Init_sfx.
+a=text.index("void Audio::Init_sfx()")
+b=text.index(anchor,a)+len(anchor)
+text=text[:b]+'''
+#ifdef SDL_PLATFORM_IOS
+    for(const char* pack:{"<DATA>/jmsfx.flx","<DATA>/jmsisfx.flx",
+                         "<DATA>/sqsfxbg.flx","<DATA>/sqsfxsi.flx"})
+        std::cerr<<"SFX pack "<<pack<<" present="<<U7exists(pack)<<std::endl;
+#endif
+'''+text[b:]
+p.write_text(text)
