@@ -82,6 +82,12 @@ assert 'target->set_clip(r.x,r.y,r.w,r.h);' in save
 # Compile and execute the production save rendering helper with deterministic
 # buffers. A tall block must fit while leaving every pixel outside the skin intact.
 paint=method(save,"static void paint_save_information(")
+# Use the real production pixel primitive, not a test-only transparency rule.
+put_pixel=method(Path("upstream/imagewin/ibuf8.h").read_text(),"void put_pixel8(").replace(" override","")
+raw_copy=method(Path("upstream/imagewin/ibuf8.cc").read_text(),"void Image_buffer8::copy_transparent8(")
+assert "if (chr)" in raw_copy  # This API skips 0, unlike the font raster's 255.
+assert "copy_transparent8(" not in paint
+assert "if(colour!=255)target->put_pixel8(" in paint
 harness=r'''
 #include <algorithm>
 #include <cassert>
@@ -98,22 +104,17 @@ struct TileRect{
 };
 struct Image_buffer8{
  int w,h;std::vector<unsigned char> p;TileRect clip;
- Image_buffer8(int a,int b):w(a),h(b),p(size_t(a)*b,255),clip(0,0,a,b){}
+ unsigned char*bits;int line_width,clipx=0,clipy=0,clipw,cliph;
+ Image_buffer8(int a,int b):w(a),h(b),p(size_t(a)*b,255),clip(0,0,a,b),bits(p.data()),line_width(a),clipw(a),cliph(b){}
  void fill8(unsigned char c){std::fill(p.begin(),p.end(),c);}
  unsigned char get_pixel8(int x,int y){return p[size_t(y)*w+x];}
  struct Clip{
  Image_buffer8*b;TileRect old;TileRect Rect()const{return old;}
- ~Clip(){b->clip=old;}
+ ~Clip(){b->set_clip(old.x,old.y,old.w,old.h);}
  };
  Clip SaveClip(){return {this,clip};}
- void set_clip(int x,int y,int w,int h){clip={x,y,w,h};}
- void copy_transparent8(const unsigned char*s,int sw,int sh,int x,int y){
- for(int yy=0;yy<sh;++yy)for(int xx=0;xx<sw;++xx){
- int dx=x+xx,dy=y+yy;
- if(dx>=clip.x&&dy>=clip.y&&dx<clip.x+clip.w&&dy<clip.y+clip.h&&s[yy*sw+xx]!=255)
- p[size_t(dy)*w+dx]=s[yy*sw+xx];
- }
- }
+ void set_clip(int x,int y,int w,int h){clip={x,y,w,h};clipx=x;clipy=y;clipw=w;cliph=h;}
+ PRODUCTION_PUT_PIXEL
  Image_buffer8*get_ib8(){return this;}
 };
 struct Game_window{
@@ -131,17 +132,17 @@ struct Shape_manager{
  }
 };
 bool legacy_korean_font_available(){return true;}
-'''+paint+r'''
+'''.replace('PRODUCTION_PUT_PIXEL',put_pixel)+paint+r'''
 int main(){
  auto*g=Game_window::get_instance();g->target.fill8(42);
  paint_save_information("many rows",120,40,92,79);
- int count=0;
+ int count=0,background=0;
  for(int y=0;y<256;++y)for(int x=0;x<256;++x){
  auto c=g->target.get_pixel8(x,y);
  if(x<120||x>=212||y<40||y>=119)assert(c==42);
- else if(c==0)++count;
+ else {assert(c!=255);if(c==0)++count;else if(c==42)++background;}
  }
- assert(count>100);
+ assert(count>100&&background>100);
  assert(g->active==&g->target);
  assert(g->target.clip.w==256&&g->target.clip.h==256);
 }
@@ -150,7 +151,7 @@ with tempfile.TemporaryDirectory() as folder:
  cpp=Path(folder)/"panel.cpp";binary=Path(folder)/"panel";cpp.write_text(harness)
  subprocess.run(["clang++","-std=c++17","-fsanitize=address,undefined","-Iupstream/shapes",str(cpp),"-o",str(binary)],check=True)
  subprocess.run([str(binary)],check=True)
-print("PASS: actual save-panel renderer restores target/clip and never touches portraits/outside pixels")
+print("PASS: production put_pixel8 preserves opaque black and transparent background; restores clip/target; bounds portraits")
 
 # Check all reviewed messages really enter the final generated source.
 items=Path("upstream/shapes/items.cc").read_text()

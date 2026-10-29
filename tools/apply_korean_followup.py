@@ -167,7 +167,12 @@ static void paint_save_information(const char* text,int x,int y,int width,int he
  auto clip=target->SaveClip();
  auto r=clip.Rect().intersect(TileRect(x,y,width,height));
  target->set_clip(r.x,r.y,r.w,r.h);
- target->copy_transparent8(fitted.pixels.data(),fitted.width,fitted.height,x,y);
+ // The raw copy_transparent8 API treats palette 0 as transparent.
+ // Our glyph raster uses 255 for transparency and 0 for opaque black.
+ for(int yy=0;yy<fitted.height;++yy)for(int xx=0;xx<fitted.width;++xx){
+  const auto colour=fitted.pixels[size_t(yy)*fitted.width+xx];
+  if(colour!=255)target->put_pixel8(colour,x+xx,y+yy);
+ }
 }
 '''
 s=s.replace('class Strings : public GumpStrings {',helper+'\nclass Strings : public GumpStrings {',1)
