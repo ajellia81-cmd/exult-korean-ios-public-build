@@ -55,6 +55,8 @@ static std::shared_ptr<KoreanPatchFont> load_korean_patch_face(const std::string
             if(face->load(bytes))return face;
         }
     }
+    if(source=="<STATIC>/fonts.vga"&&index!=0)
+        return load_korean_patch_face(source,index==3||index==6?1:0);
     return {};
 }
 """
@@ -255,4 +257,32 @@ text=text.replace(needle,'''    if(std::string(name)=="SMALL_BLACK_FONT") {
         if(face)font->native_face=std::move(face);
     }
 '''+needle)
+p.write_text(text)
+
+
+# Load the installed pack's engine messages after the stock fallback messages.
+p=Path("upstream/shapes/items.cc")
+text=p.read_text()
+if '#include "font_map.h"' not in text:
+    p.write_text('#include "font_map.h"\n'+text)
+p=Path("upstream/shapes/items.cc");text=p.read_text()
+anchor="\t// Exult new-style messages?"
+if text.count(anchor)!=1:raise RuntimeError("Global Korean messages anchor changed")
+text=text.replace(anchor,'''    for(const auto* file:{"<CONFIG>/patch/exultmsg.txt","<CONFIG>/patch/EXULTMSG.TXT"}) {
+        if(U7exists(file)) {
+            set_font_map_legacy_korean(true);
+            exultmsgs.emplace_back(file,0);
+            break;
+        }
+    }
+
+'''+anchor,1)
+p.write_text(text)
+# Latest initgame packs contain translated NPC names. Preserve those names
+# directly; the old hash/offset resolver remains only for the old data pack.
+p=Path("upstream/gumps/ItemMenu_gump.cc");text=p.read_text()
+anchor="    const std::string original = object->get_name();"
+text=text.replace(anchor,anchor+'''
+    if(U7exists("<CONFIG>/patch/font0bg.fnt")||U7exists("<CONFIG>/patch/FONT0BG.FNT"))
+        return original;''',1)
 p.write_text(text)

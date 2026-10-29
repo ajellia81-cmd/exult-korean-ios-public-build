@@ -81,7 +81,7 @@ int main(){
  }}
  // A malformed pair must not be accepted as complete Korean text.
  assert(!is_legacy_korean_text(std::string("\xb0",1)));
- assert(!is_legacy_korean_text(std::string("\xb0" "A",2)));
+ assert(is_legacy_korean_text(std::string("\xb0" "A",2))); // Valid CP949 extension pair
  assert(!is_legacy_korean_text("ASCII"));
  for(bool mode:{false,true}) {
   const auto& map=mode?utf8_to_font_special:utf8_to_font_ascii;

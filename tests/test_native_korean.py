@@ -15,7 +15,7 @@ int main(){
  KoreanPatchFont face;assert(face.load(b));assert(face.glyphs.size()==2);
  auto* g=face.get(0x8141);assert(g&&g->x==-1&&g->y==-2&&g->advance==12);
  assert(g->pixels[0]==51&&g->pixels[1]==58);
- assert(g->pixels[4]==255&&g->pixels[6]==0);
+ assert(g->pixels[4]==255&&g->pixels[5]==0);
  assert(g->left==0&&g->right==3);
  for(size_t n=0;n<b.size();++n){
   std::vector<unsigned char> shortfile(b.begin(),b.begin()+n);
