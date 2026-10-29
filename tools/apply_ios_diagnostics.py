@@ -773,3 +773,33 @@ text = text[:start] + """void Itemmenu_gump::fix_position(int num_elements) {
 }
 """ + text[end:]
 p.write_text(text)
+
+# Approved B: one extra horizontal ink pixel for Korean Text_button labels.
+# The existing four-pixel glyph padding contains the dilation, preserving
+# advances and leaving room before the next character. Other text is unchanged.
+replace("shapes/font.h", "bool legacy_korean_font_available();",
+        "bool legacy_korean_font_available();\nbool set_legacy_korean_button_bold(bool enabled);")
+replace("shapes/font.cc", "static bool legacy_korean_font_enabled = true;",
+'''static bool legacy_korean_font_enabled = true;
+static bool legacy_korean_button_bold = false;
+bool set_legacy_korean_button_bold(bool enabled) {
+    const bool previous = legacy_korean_button_bold;
+    legacy_korean_button_bold = enabled;
+    return previous;
+}''')
+replace("shapes/font.cc",
+'''                    pixels[(row + 1) * w + col + 1] = ink_colour;''',
+'''                {
+                    pixels[(row + 1) * w + col + 1] = ink_colour;
+                    if (legacy_korean_button_bold)
+                        pixels[(row + 1) * w + col + 2] = ink_colour;
+                }''')
+replace("gumps/Text_button.cc", "void Text_button::paint() {",
+'''namespace {
+struct Korean_button_weight_scope {
+    const bool previous = set_legacy_korean_button_bold(true);
+    ~Korean_button_weight_scope() { set_legacy_korean_button_bold(previous); }
+};
+}
+void Text_button::paint() {
+    Korean_button_weight_scope korean_weight;''')
