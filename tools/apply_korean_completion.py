@@ -40,15 +40,15 @@ labels={
 p=Path("upstream/shapes/items.cc");s=p.read_text()
 a,b=body(s,"void Setup_text(bool si,")
 overrides='\n    if(U7exists("<CONFIG>/patch/FONT0BG.FNT")||U7exists("<CONFIG>/patch/font0bg.fnt")||U7exists("<CONFIG>/patch/FONT0SI.FNT")||U7exists("<CONFIG>/patch/font0si.fnt")) {\n'
-for code,text in labels.items():overrides+=f"        Set_text_msg(0x{code:X}-msg_file_start,{cp(text)});\n"
+for code,text in labels.items():overrides+=f"        Set_text_msg(0x{code:X} - msg_file_start,{cp(text)});\n"
 overrides+="    }\n"
 s=s[:b-1]+overrides+s[b-1:];p.write_text(s)
 p=Path("upstream/gumps/UIOptions_gump.cc");s=p.read_text()
-s=s.replace("Image_window::get_displayname_for_scaler(Image_window::point)","get_text_msg(0x69A-msg_file_start)")
-s=s.replace("Image_window::get_displayname_for_scaler(Image_window::bilinear)","get_text_msg(0x69C-msg_file_start)")
+s=s.replace("Image_window::get_displayname_for_scaler(Image_window::point)","get_text_msg(0x69A - msg_file_start)")
+s=s.replace("Image_window::get_displayname_for_scaler(Image_window::bilinear)","get_text_msg(0x69C - msg_file_start)")
 s=s.replace("scaler_text.emplace_back(Image_window::get_displayname_for_scaler(i));",
-'''scaler_text.emplace_back(i==Image_window::point?get_text_msg(0x69A-msg_file_start):
-                i==Image_window::bilinear?get_text_msg(0x69C-msg_file_start):
+'''scaler_text.emplace_back(i==Image_window::point?get_text_msg(0x69A - msg_file_start):
+                i==Image_window::bilinear?get_text_msg(0x69C - msg_file_start):
                 Image_window::get_displayname_for_scaler(i));''')
 p.write_text(s)
 
