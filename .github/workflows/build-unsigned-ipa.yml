@@ -82,6 +82,8 @@ jobs:
         run: |
           mkdir -p ipa/Payload
           cp -R build/Build/Products/Release-iphoneos/Exult.app ipa/Payload/
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Ultima VII" ipa/Payload/Exult.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName Ultima VII" ipa/Payload/Exult.app/Info.plist
           ditto -c -k --sequesterRsrc --keepParent ipa/Payload Exult-korean-engine-unsigned.ipa
 
       - uses: actions/upload-artifact@v4

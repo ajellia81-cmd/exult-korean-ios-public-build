@@ -542,3 +542,12 @@ p.write_text(text)
 replace("gumps/Gump_manager.cc", "bool Gump_manager::remove_gump(Gump* gump) {",
 '''bool Gump_manager::remove_gump(Gump* gump) {
     gump->free_render_layer();''')
+
+# Keep the notebook clear of rounded iPhone display corners. Move the gump
+# itself so its layer and inverse input mapping share the same new origin.
+replace("gumps/Notebook_gump.cc", "\tset_pos(5, -2);",
+'''#if defined(SDL_PLATFORM_IOS)
+    set_pos(32, 4);
+#else
+    set_pos(5, -2);
+#endif''')
