@@ -40,6 +40,8 @@ prefix=prefix.replace(" static Image_buffer8* screen;",''' static Image_buffer8*
   auto old=screen;screen=target;paint_rle(x,y);screen=old;
  }
 ''')
+prefix += pathlib.Path("tools/korean_patch_font.h").read_text()
+prefix += "\nbool korean_patch_pack_present(){return false;}\n"
 prefix+=r'''
 struct Shape_file {
  Shape_frame ascii; int high_requests=0;
@@ -60,6 +62,12 @@ struct Game_window {
 };
 template<typename T> void ignore_unused_variable_warning(const T&){}
 struct Font {
+ std::shared_ptr<KoreanPatchFont> native_face;
+ bool native_style(const char*,int);
+ int native_width(const char*,int,int=0);
+ int native_draw(Image_buffer8*,const char*,int,int,int,unsigned char*,int=0);
+ void native_bounds(const char*,int&,int&,int&,int&);
+
  std::unique_ptr<Shape_file> font_shapes=std::make_unique<Shape_file>();
  bool legacy_korean_layout_override=false;
  int highest=10,lowest=3,hor_lead=-1,ver_lead=0;
@@ -85,6 +93,8 @@ for name in ["int Font::paint_text(","int Font::paint_text_fixedwidth(","int Fon
     production+="\n"+"\n".join(overloads(name))
 production += "\n" + function("void Font::get_text_ink_bounds(")
 production += "\n" + function("int Font::get_text_edge_padding(")
+for method in ("bool Font::native_style(", "int Font::native_width(", "int Font::native_draw(", "void Font::native_bounds("):
+    production += "\n" + function(method)
 tests=r'''
 int main(){
  constexpr int gw=11,gh=11,stride=2,size=stride*gh;

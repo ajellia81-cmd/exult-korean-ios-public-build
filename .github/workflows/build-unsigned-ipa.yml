@@ -59,7 +59,9 @@ jobs:
           git apply ../patches/legacy-korean-font.patch
 
       - name: Apply iOS device diagnostics
-        run: python3 tools/apply_ios_diagnostics.py
+        run: |
+          python3 tools/apply_ios_diagnostics.py
+          python3 tools/apply_native_korean.py
 
       - name: Test production Korean font loader with synthetic data
         run: |
@@ -69,6 +71,7 @@ jobs:
           python3 tests/test_korean_paths.py
           python3 tests/test_ios_lifecycle.py
           python3 tests/test_menu_layers.py
+          python3 tests/test_native_korean.py
 
       - name: Upload encoding audit report
         uses: actions/upload-artifact@v4
