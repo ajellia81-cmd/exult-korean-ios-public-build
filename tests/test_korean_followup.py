@@ -158,6 +158,8 @@ struct Font{
  std::shared_ptr<KoreanPatchFont> native_face=std::make_shared<KoreanPatchFont>();
  std::unique_ptr<Shape_file> font_shapes=std::make_unique<Shape_file>();
  int hor_lead=1,highest=4;
+ bool native_ascii_override=false;
+ bool set_native_ascii_override(bool v){bool old=native_ascii_override;native_ascii_override=v;return old;}
  struct Call{std::string text;int left,top,width,height;};
  std::vector<Call> calls;
  bool native_style(const char*,int);
@@ -200,7 +202,7 @@ void load_fixture(const std::string&text){
  for(auto c:codes){append16(data,c);data.push_back(255);data.push_back(254);data.push_back(c<128?4:8);}
  for(auto c:codes){
   std::vector<unsigned char> pix(64,0);
-  int w=c<128?3:7,h=c<128?5:7;
+  int w=c<128?3:7,h=7;
   if(c!=' ')for(int y=0;y<h;++y)for(int x=0;x<w;++x)
    if(x==0||x==w-1||y==0||y==h-1||((c>>(x+y)%9)&1))pix[y*8+x]=1;
   for(int p=0;p<64;p+=4)data.push_back((pix[p]<<6)|(pix[p+1]<<4)|(pix[p+2]<<2)|pix[p+3]);
@@ -236,6 +238,7 @@ void check_panel(const std::string&text,int expected){
  }
  assert(ink>100&&background>100);
  assert(!legacy_korean_layout_override);
+ assert(!fixture_font.native_ascii_override);
  assert(g->target.clip.w==256&&g->target.clip.h==256);
 }
 int main(){
@@ -243,6 +246,7 @@ int main(){
  load_fixture(expected);
  check_panel(expected,9);
  assert(fixture_font.calls[7].text=="2026-10-29 22:41");
+ assert(fixture_font.calls[7].height==7); // Native digits, not the 5px legacy font.
  assert(fixture_font.calls[8].text.find("exult00bg.sav")!=std::string::npos);
  // Long values must preserve native pixels, stop at complete CP949 units and
  // use an ellipsis. Neither the source nor the saved name is edited.

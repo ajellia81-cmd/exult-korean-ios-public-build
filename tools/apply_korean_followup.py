@@ -115,6 +115,17 @@ s=s.replace('menu->add_entry(entry);\n\t\tif (exultgame.has_mods()) {',
 s=s.replace('ypos += 45;','ypos += title_row_height;\n            title_row_height=45;',1)
 p.write_text(s)
 
+# Keep ASCII-only rows in the same installed face as mixed Korean rows.
+edit("shapes/font.h","public:\n    Font();",'''    bool native_ascii_override=false;
+public:
+    bool set_native_ascii_override(bool value){
+        const bool old=native_ascii_override;native_ascii_override=value;return old;
+    }
+    Font();''')
+edit("shapes/font.cc",
+ "if(legacy_korean_layout_override)return true;",
+ "if(native_ascii_override||legacy_korean_layout_override)return true;")
+
 # Draw each save-info line at its native pixel size inside the skin panel.
 # Date and time share one unambiguous ISO row; filenames and user names are never modified.
 p=Path("upstream/gumps/Newfile_gump.cc");s=p.read_text()
@@ -128,6 +139,10 @@ static void paint_save_information(const char* text,int x,int y,int width,int he
   sm->paint_text_box(4,text,x,y,width,height);return;
  }
  auto face=sm->get_font(4);
+ struct Native_ascii_scope{
+  Font& face;bool previous;
+  ~Native_ascii_scope(){face.set_native_ascii_override(previous);}
+ } native_ascii{*face,face->set_native_ascii_override(true)};
  struct Row{std::string text;int left=0,top=0,width=0,height=0;};
  std::vector<Row> rows;
  const std::string input=text?text:"";
