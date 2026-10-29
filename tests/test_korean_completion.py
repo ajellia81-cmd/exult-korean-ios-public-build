@@ -187,3 +187,9 @@ assert "korean_serpentine(str)" in text_gump
 save=Path("upstream/gumps/Newfile_gump.cc").read_text()
 assert re.search(r'Newfile_gump::infoh\s*=\s*92;',save)
 print("PASS: book/scroll/sign layer origins and save information room")
+
+for name in ("GUARDIAN_FONT","END2_FONT","END3_FONT","SIINTRO_FONT","MENU_FONT"):
+ assert font.count('native_name=="'+name+'"')==2
+assert 'load_korean_patch_face("<STATIC>/endgame.dat",4)' in font
+assert 'load_korean_patch_face("<STATIC>/endgame.dat",5)' in font
+print("PASS: guardian, BG/SI menu and endgame named font routing")

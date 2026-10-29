@@ -254,3 +254,18 @@ s=s[:a]+part+s[b:];p.write_text(s)
 # Text gumps paint in a local layer but hit-test in their original game-space
 # coordinates, just like other gumps. Retain that origin in layer_bounds.
 edit("gumps/Text_gump.cc","layer_bounds = TileRect(0, 0, w, h);","layer_bounds = r;")
+
+
+# The current embedded font collection also moved guardian/endgame faces.
+# Keep all named cinematic faces connected to their original Korean pack IDs.
+p=Path("upstream/shapes/font.cc");s=p.read_text()
+anchor='    else if(native_name=="NORMAL_FONT"||native_name=="EXULT_END_FONT")'
+extra='''    else if(native_name=="GUARDIAN_FONT")
+        named_face=load_korean_patch_face("<STATIC>/mainshp.flx",3);
+    else if(native_name=="END2_FONT")
+        named_face=load_korean_patch_face("<STATIC>/endgame.dat",4);
+    else if(native_name=="END3_FONT")
+        named_face=load_korean_patch_face("<STATIC>/endgame.dat",5);
+'''
+if s.count(anchor)!=2:raise RuntimeError("Cinematic face routing anchors")
+s=s.replace(anchor,extra+anchor);p.write_text(s)
