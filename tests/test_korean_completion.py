@@ -185,7 +185,7 @@ text_gump=Path("upstream/gumps/Text_gump.cc").read_text()
 assert "layer_bounds = r;" in method(text_gump,"bool Text_gump::begin_layer_paint(")
 assert "korean_serpentine(str)" in text_gump
 save=Path("upstream/gumps/Newfile_gump.cc").read_text()
-assert re.search(r'Newfile_gump::infoh\s*=\s*92;',save)
+assert re.search(r'Newfile_gump::infoh\s*=\s*79;',save)
 print("PASS: book/scroll/sign layer origins and save information room")
 
 for name in ("GUARDIAN_FONT","END2_FONT","END3_FONT","SIINTRO_FONT","MENU_FONT"):
