@@ -322,3 +322,24 @@ for signature,extra in [
  b=text.index(";",b)+1
  text=text[:b]+"\n"+extra+text[b:]
 p.write_text(text)
+
+
+# Match native metrics in generic UI row layout as well as text-specific boxes.
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+anchor="int Font::get_text_height() { return highest + lowest + 1; }"
+if text.count(anchor)!=1:raise RuntimeError("Native UI metric anchor changed")
+text=text.replace(anchor,'''int Font::get_text_height() {
+    return native_face ? std::max(highest+lowest+1,native_face->height)
+                       : highest+lowest+1;
+}''',1)
+text=text.replace("if(native_face){\n    int x=0;for(int i=0;i<textlen;){",
+'''if(native_face){
+    Korean_layout_scope context(legacy_korean_layout_override,native_style(text,textlen));
+    int x=0;for(int i=0;i<textlen;){''',1)
+# Respect explicitly bounded spans when calculating native line height.
+text=text.replace("if(native_face){\n    int l,t,w,h;native_bounds(text,l,t,w,h);",
+'''if(native_face){
+    std::string bounded;
+    if(text&&length>=0){bounded.assign(text,length);text=bounded.c_str();}
+    int l,t,w,h;native_bounds(text,l,t,w,h);''',1)
+p.write_text(text)

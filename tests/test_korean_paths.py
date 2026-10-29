@@ -221,6 +221,8 @@ int main(){
     assert(xx>=10+l&&xx<10+l+w&&yy>=10+t&&yy<10+t+h);
   assert(f.find_xcursor(mixed,3,11)==0);
   assert(f.find_xcursor(mixed,3,12)==2);
+  assert(f.find_xcursor(mixed,3,14)==2);
+  assert(f.find_xcursor(mixed,3,15)==-1);
   assert(f.get_text_width("\xa1\xa6")==3*f.get_text_width("."));
   assert(f.get_text_width("\xa1\xb0")==f.get_text_width("\""));
   f.native_face.reset();
