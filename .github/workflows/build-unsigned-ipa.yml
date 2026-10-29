@@ -1,4 +1,5 @@
 name: build-unsigned-ipa
+# Fresh consolidated build requested by user.
 
 on:
   workflow_dispatch:
