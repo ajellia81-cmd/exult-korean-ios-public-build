@@ -634,8 +634,17 @@ p.write_text(p.read_text() + r'''
 #import <SDL3/SDL.h>
 
 // One native dismissal control for every SDL text-input screen.
+static UIView* ExultFindKeyboardResponder(UIView* view) {
+    if (view.isFirstResponder) return view;
+    for (UIView* child in view.subviews) {
+        UIView* responder = ExultFindKeyboardResponder(child);
+        if (responder) return responder;
+    }
+    return nil;
+}
+
 @interface ExultKeyboardDismissControl : NSObject
-@property(nonatomic, strong) UIButton* button;
+@property(nonatomic, strong) UIToolbar* toolbar;
 - (void)keyboardFrame:(NSNotification*)notification;
 - (void)keyboardHidden:(NSNotification*)notification;
 - (void)dismissKeyboard;
@@ -643,40 +652,43 @@ p.write_text(p.read_text() + r'''
 
 @implementation ExultKeyboardDismissControl
 - (void)keyboardFrame:(NSNotification*)notification {
+    (void)notification;
     SDL_Window* sdlWindow = SDL_GetKeyboardFocus();
     if (!sdlWindow) return;
     UIWindow* window = (__bridge UIWindow*)SDL_GetPointerProperty(
         SDL_GetWindowProperties(sdlWindow), SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER, nullptr);
     if (!window) return;
-    CGRect frame = [notification.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
-    CGRect keyboard = [window convertRect:frame fromWindow:nil];
-    CGRect overlap = CGRectIntersection(window.bounds, keyboard);
-    if (CGRectIsNull(overlap) || overlap.size.height <= 0) {
-        [self.button removeFromSuperview];
-        return;
+    UIView* responder = ExultFindKeyboardResponder(window);
+    if (!responder) return;
+    if (!self.toolbar) {
+        self.toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, window.bounds.size.width, 44)];
+        self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        UIBarButtonItem* space = [[UIBarButtonItem alloc]
+            initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+        UIBarButtonItem* done = [[UIBarButtonItem alloc]
+            initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(dismissKeyboard)];
+        self.toolbar.items = @[space, done];
     }
-    if (!self.button) {
-        self.button = [UIButton buttonWithType:UIButtonTypeSystem];
-        [self.button setTitle:@"키보드 내리기 ⌄" forState:UIControlStateNormal];
-        [self.button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-        self.button.backgroundColor = [UIColor colorWithWhite:0.12 alpha:0.92];
-        self.button.layer.cornerRadius = 10;
-        self.button.accessibilityLabel = @"키보드 내리기";
-        [self.button addTarget:self action:@selector(dismissKeyboard) forControlEvents:UIControlEventTouchUpInside];
+    // SDL's iOS text input uses a UITextField. Use the native accessory slot,
+    // so UIKit handles keyboard animation, orientation and safe-area layout.
+    if ([responder isKindOfClass:UITextField.class]) {
+        UITextField* field = (UITextField*)responder;
+        if (field.inputAccessoryView != self.toolbar) {
+            field.inputAccessoryView = self.toolbar;
+            [field reloadInputViews];
+        }
+    } else if ([responder isKindOfClass:UITextView.class]) {
+        UITextView* field = (UITextView*)responder;
+        if (field.inputAccessoryView != self.toolbar) {
+            field.inputAccessoryView = self.toolbar;
+            [field reloadInputViews];
+        }
     }
-    const CGFloat width = 160, height = 44;
-    self.button.frame = CGRectMake(
-        MAX(window.safeAreaInsets.left, window.bounds.size.width - window.safeAreaInsets.right - width - 8),
-        MAX(window.safeAreaInsets.top, overlap.origin.y - height - 4), width, height);
-    [window addSubview:self.button];
-    [window bringSubviewToFront:self.button];
 }
 - (void)keyboardHidden:(NSNotification*)notification {
-    (void)notification;
-    [self.button removeFromSuperview];
+    (void)notification; // UIKit owns accessory visibility.
 }
 - (void)dismissKeyboard {
-    // Run on SDL's main thread and update its text-input state as well as UIKit.
     SDL_RunOnMainThread([](void*) {
         SDL_Window* window = SDL_GetKeyboardFocus();
         if (window && SDL_TextInputActive(window)) SDL_StopTextInput(window);
