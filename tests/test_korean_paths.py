@@ -132,6 +132,34 @@ int main(){
   assert(f.find_xcursor(mixed.data(),int(mixed.size()),4)==1);
   ++checked;
  }
+
+ // Rounded noninteger scaling must retain all source edge strokes.
+ // Cover every width/height, including 2->2 and 6->7.
+ {
+  auto& source=f.font_shapes->ascii;
+  const auto saved=source.pixels;
+  const int savedw=source.w,savedh=source.h;
+  for(int sw=1;sw<=12;++sw)for(int sh=1;sh<=12;++sh){
+   source.w=sw;source.h=sh;source.pixels.assign(sw*sh,255);
+   for(int yy=0;yy<sh;++yy)for(int xx=0;xx<sw;++xx)
+    if(xx==0||xx==sw-1||yy==0||yy==sh-1||(xx+yy)%3==0)
+     source.pixels[yy*sw+xx]=1;
+   Korean_ascii_glyph glyph(&source,-1,0);
+   const int dw=std::max(1,int(std::lround(sw*11.0/9.0)));
+   const int dh=std::max(1,int(std::lround(sh*11.0/9.0)));
+   for(int yy=0;yy<dh;++yy)for(int xx=0;xx<dw;++xx){
+    const bool expected=source.pixels[(yy*sh/dh)*sw+xx*sw/dw]==1;
+    assert((glyph.pixels[(yy+1)*glyph.w+xx+1]==1)==expected);
+   }
+   assert(glyph.xleft<=0);
+   int right=-1;
+   for(int yy=0;yy<glyph.h;++yy)for(int xx=0;xx<glyph.w;++xx)
+    if(glyph.pixels[yy*glyph.w+xx]!=255)right=std::max(right,xx-glyph.xleft);
+   assert(glyph.advance()>right);
+  }
+  source.pixels=saved;source.w=savedw;source.h=savedh;
+ }
+
  assert(f.font_shapes->high_requests==0);
  {
   auto& source=f.font_shapes->ascii;

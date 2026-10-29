@@ -1118,3 +1118,17 @@ text = text.replace(anchor, """    const int slot = std::max(1, (object_area.h -
 text = text.replace("const int dw = std::min(iw, available);",
     "const int dw = std::max(1, std::min(std::min(iw, available), iw * slot / ih));")
 p.write_text(text)
+
+
+# Map destination pixels using the rounded destination size. Dividing by the
+# nominal 11/9 factor loses the last source column/row when it rounds down
+# (e.g. a 2px glyph -> 2px, or 6px -> 7px), corrupting Latin letter shapes.
+replace("shapes/font.cc",
+        "static_cast<int>(x / scale)", "x * oldw / iw")
+replace("shapes/font.cc",
+        "static_cast<int>(y / scale)", "y * oldh / ih")
+# A rebuilt outline may extend left of the legacy origin. Keep it in its own
+# advance cell so the next letter cannot overwrite the previous letter.
+replace("shapes/font.cc",
+        "xleft = 1 - left; yabove = 1 - top;",
+        "xleft = std::min(0, 1 - left); yabove = 1 - top;")
