@@ -65,7 +65,7 @@ print("PASS: native center dispatch and CP949-safe column wrapping")
 
 
 save=Path("upstream/gumps/Newfile_gump.cc").read_text()
-assert re.search(r'Newfile_gump::infoh\s*=\s*79;',save)
+assert re.search(r'Newfile_gump::infoh\s*=\s*72;',save)
 assert save.count('paint_save_information(info, x + infox, y + infoy, infow, infoh);')==2
 assert '"%04i-%02i-%02i %02i:%02i"' in save
 assert 'Strings::ordinal_numeral_suffix(details->real_day)' not in save
@@ -81,7 +81,7 @@ def lit(s):
  return '"'+''.join('\\%03o'%b for b in s.encode('cp949'))+'"'
 fixture=[
  '아바타: AvatarTest','경험: 300  생명: 18','힘: 18  민첩: 18','지능: 18  훈련: 3',
- '게임 일수: 0','게임 시간: 09:54','저장 횟수: 17','2026-10-29 22:41','파일: exult00bg.sav']
+ '게임 일수: 0  09:54','저장 횟수: 17','2026-10-29 22:41','파일: exult00bg.sav']
 joined='\n'.join(fixture)
 put_pixel=method(Path("upstream/imagewin/ibuf8.h").read_text(),"void put_pixel8(").replace(" override","")
 native='\n'.join(method(font,sign) for sign in (
@@ -217,12 +217,12 @@ struct Details{int game_day=0,game_hour=9,game_minute=54,save_count=17,real_year
 void check_panel(const std::string&text,int expected){
  auto*g=Game_window::get_instance();
  std::fill(g->target.p.begin(),g->target.p.end(),42);fixture_font.calls.clear();
- paint_save_information(text.c_str(),120,40,92,79);
+ paint_save_information(text.c_str(),120,40,92,72);
  assert(int(fixture_font.calls.size())==expected);
  int bottom=40;
  for(const auto&c:fixture_font.calls){
   assert(c.left>=120&&c.left+c.width<=212);
-  assert(c.top>=bottom&&c.top+c.height<=119);
+  assert(c.top>=bottom&&c.top+c.height<=112);
   assert(c.width>0&&c.height>0);
   int ink=0;
   for(int yy=c.top;yy<c.top+c.height;++yy)for(int xx=c.left;xx<c.left+c.width;++xx)
@@ -233,7 +233,7 @@ void check_panel(const std::string&text,int expected){
  int ink=0,background=0;
  for(int y=0;y<256;++y)for(int x=0;x<256;++x){
   auto c=g->target.p[size_t(y)*256+x];
-  if(x<120||x>=212||y<40||y>=119)assert(c==42);
+  if(x<120||x>=212||y<40||y>=112)assert(c==42);
   else{assert(c==0||c==42);if(c==0)++ink;else ++background;}
  }
  assert(ink>100&&background>100);
@@ -244,23 +244,23 @@ void check_panel(const std::string&text,int expected){
 int main(){
  const std::string expected=FIXTURE;
  load_fixture(expected);
- check_panel(expected,9);
- assert(fixture_font.calls[7].text=="2026-10-29 22:41");
- assert(fixture_font.calls[7].height==7); // Native digits, not the 5px legacy font.
- assert(fixture_font.calls[8].text.find("exult00bg.sav")!=std::string::npos);
+ check_panel(expected,8);
+ assert(fixture_font.calls[6].text=="2026-10-29 22:41");
+ assert(fixture_font.calls[6].height==7); // Native digits, not the 5px legacy font.
+ assert(fixture_font.calls[7].text.find("exult00bg.sav")!=std::string::npos);
  // Long values must preserve native pixels, stop at complete CP949 units and
  // use an ellipsis. Neither the source nor the saved name is edited.
  std::string long_text=expected;
  long_text.insert(long_text.find('\n'),std::string(100,'A'));
- check_panel(long_text,9);
+ check_panel(long_text,8);
  assert(fixture_font.calls[0].text.substr(fixture_font.calls[0].text.size()-3)=="...");
  Party party[1];Details d;Details*details=&d;char info[320];
  PRODUCTION_FORMAT
  std::string formatted=info;
- assert(std::count(formatted.begin(),formatted.end(),'\n')==7);
+ assert(std::count(formatted.begin(),formatted.end(),'\n')==6);
  assert(formatted.substr(formatted.size()-16)=="2026-10-29 22:41");
  formatted+="\n"+std::string(FILE_LABEL)+": exult00bg.sav";
- check_panel(formatted,9);
+ check_panel(formatted,8);
 }
 '''
 string_values={'Avatar':'아바타','Exp':'경험','Hp':'생명','Str':'힘','Dxt':'민첩','Int':'지능','Trn':'훈련',

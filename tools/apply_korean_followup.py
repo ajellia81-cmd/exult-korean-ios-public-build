@@ -130,7 +130,7 @@ edit("shapes/font.cc",
 # Date and time share one unambiguous ISO row; filenames and user names are never modified.
 p=Path("upstream/gumps/Newfile_gump.cc");s=p.read_text()
 s=s.replace('#include "touchui.h"','#include "touchui.h"\n#include "font.h"\n#include "ibuf8.h"\n#include "../shapes/korean_runtime_text.h"')
-s=re.sub(r'(Newfile_gump::infoh\s*=\s*)92;',r'\g<1>79;',s)
+s=re.sub(r'(Newfile_gump::infoh\s*=\s*)92;',r'\g<1>72;',s)
 helper=r'''
 static void paint_save_information(const char* text,int x,int y,int width,int height){
  auto* gw=Game_window::get_instance();
@@ -167,7 +167,7 @@ static void paint_save_information(const char* text,int x,int y,int width,int he
  // Preserve native pixels. Measure each complete line, including bearings,
  // instead of resizing a raster or reflowing a mixed-script paragraph.
  int ink_height=0;for(const auto& row:rows)ink_height+=std::max(1,row.height);
- const int gap=rows.size()>1?std::max(0,(height-ink_height)/int(rows.size()-1)):0;
+ const int gap=rows.size()>1?std::min(1,std::max(0,(height-ink_height)/int(rows.size()-1))):0;
  auto* target=gw->get_win()->get_ib8();
  auto clip=target->SaveClip();
  auto r=clip.Rect().intersect(TileRect(x,y,width,height));
@@ -183,6 +183,12 @@ static void paint_save_information(const char* text,int x,int y,int width,int he
 s=s.replace('class Strings : public GumpStrings {',helper+'\nclass Strings : public GumpStrings {',1)
 s=s.replace('sman->paint_text_box(4, info, x + infox, y + infoy, infow, infoh);',
  'paint_save_information(info, x + infox, y + infoy, infow, infoh);')
+# Share the game day/time row rather than spreading text down to the skin edge.
+old_game='"%s: %i\\n"\n\t\t\t\t"%s: %02i:%02i\\n"'
+if s.count(old_game)!=1:raise RuntimeError("Game time row anchor")
+s=s.replace(old_game,'"%s: %i  %02i:%02i\\n"',1)
+s=s.replace('Strings::GameDay(), details->game_day, Strings::GameTime(), details->game_hour, details->game_minute,',
+            'Strings::GameDay(), details->game_day, details->game_hour, details->game_minute,',1)
 old_date='"%s: %i%s %s %04i\\n"\n\t\t\t\t"%s: %02i:%02i"'
 if s.count(old_date)!=1:raise RuntimeError("Save date format anchor changed")
 s=s.replace(old_date,'"%04i-%02i-%02i %02i:%02i"',1)
