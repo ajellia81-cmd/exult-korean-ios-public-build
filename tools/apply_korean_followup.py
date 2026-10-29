@@ -130,9 +130,10 @@ edit("shapes/font.cc",
 # Date and time share one unambiguous ISO row; filenames and user names are never modified.
 p=Path("upstream/gumps/Newfile_gump.cc");s=p.read_text()
 s=s.replace('#include "touchui.h"','#include "touchui.h"\n#include "font.h"\n#include "ibuf8.h"\n#include "../shapes/korean_runtime_text.h"')
-s=re.sub(r'(Newfile_gump::infoh\s*=\s*)92;',r'\g<1>72;',s)
+s=re.sub(r'(Newfile_gump::infoh\s*=\s*)92;',r'\g<1>79;',s)
 helper=r'''
 static void paint_save_information(const char* text,int x,int y,int width,int height){
+ height=std::min(height,72); // Inner skin limit, leaving bottom margin.
  auto* gw=Game_window::get_instance();
  auto* sm=Shape_manager::get_instance();
  if(!legacy_korean_font_available()){

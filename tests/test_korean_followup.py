@@ -65,7 +65,7 @@ print("PASS: native center dispatch and CP949-safe column wrapping")
 
 
 save=Path("upstream/gumps/Newfile_gump.cc").read_text()
-assert re.search(r'Newfile_gump::infoh\s*=\s*72;',save)
+assert re.search(r'Newfile_gump::infoh\s*=\s*79;',save)
 assert save.count('paint_save_information(info, x + infox, y + infoy, infow, infoh);')==2
 assert '"%04i-%02i-%02i %02i:%02i"' in save
 assert 'Strings::ordinal_numeral_suffix(details->real_day)' not in save
