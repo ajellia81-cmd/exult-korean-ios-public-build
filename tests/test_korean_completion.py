@@ -193,3 +193,13 @@ for name in ("GUARDIAN_FONT","END2_FONT","END3_FONT","SIINTRO_FONT","MENU_FONT")
 assert 'load_korean_patch_face("<STATIC>/endgame.dat",4)' in font
 assert 'load_korean_patch_face("<STATIC>/endgame.dat",5)' in font
 print("PASS: guardian, BG/SI menu and endgame named font routing")
+
+items=Path("upstream/shapes/items.cc").read_text()
+lines=[l for l in items.splitlines() if re.search(r'Set_text_msg\(0x[0-9A-F]+ - msg_file_start,',l)]
+assert len(lines)>=30
+code='#include <cassert>\nconstexpr unsigned msg_file_start=0x400;\nint count=0;\nvoid Set_text_msg(unsigned,const char* s){assert(s&&*s);++count;}\nint main(){\n'+'\n'.join(lines)+'\nassert(count>=30);}\n'
+with tempfile.TemporaryDirectory() as folder:
+ cpp=Path(folder)/"labels.cpp";binary=Path(folder)/"labels";cpp.write_text(code)
+ subprocess.run(["clang++","-std=c++17",str(cpp),"-o",str(binary)],check=True)
+ subprocess.run([str(binary)],check=True)
+print("PASS: all reviewed CP949 label literals compile as production C++")
