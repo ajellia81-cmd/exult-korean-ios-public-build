@@ -551,3 +551,84 @@ replace("gumps/Notebook_gump.cc", "\tset_pos(5, -2);",
 #else
     set_pos(5, -2);
 #endif''')
+
+# Fit only the launcher/menu scenes; keep gameplay video settings untouched.
+p = Path("upstream/exultmenu.cc")
+text = p.read_text()
+helper = """
+static void fit_launcher_scene(Scene_view& scene, int w, int h) {
+    auto* gwin = Game_window::get_instance();
+    auto* win = gwin->get_win();
+    const int dw = win->get_display_width(), dh = win->get_display_height();
+    // Integer arithmetic preserves the scene ratio without cropping.
+    int width = dw, height = static_cast<int>(static_cast<long long>(dw) * h / w);
+    if (height > dh) {
+        height = dh;
+        width = static_cast<int>(static_cast<long long>(dh) * w / h);
+    }
+    gwin->layer_set_dest(scene.get_handle(), (dw - width) / 2, (dh - height) / 2, width, height);
+}
+"""
+anchor = 'using std::'
+position = text.find(anchor)
+if position < 0: raise RuntimeError("Launcher helper anchor missing")
+text = text[:position] + helper + "\n" + text[position:]
+for anchor, call in [
+    ("Scene_view mods_scene(dummy_topx, dummy_topy, centerx, centery, ibuf, true, scene_w, scene_h);",
+     "fit_launcher_scene(mods_scene, scene_w, scene_h);"),
+    ("Scene_view logo_scene(splash_topx, splash_topy, centerx, centery, ibuf, false, 320, 200);",
+     "fit_launcher_scene(logo_scene, 320, 200);"),
+    ("menu_scene.emplace(dummy_topx, dummy_topy, centerx, centery, ibuf, true, scene_w, scene_h);",
+     "fit_launcher_scene(*menu_scene, scene_w, scene_h);")]:
+    if text.count(anchor) != 1: raise RuntimeError("Launcher scene anchor missing")
+    text = text.replace(anchor, anchor + "\n    " + call)
+p.write_text(text)
+
+# On touch devices accept the full checkmark rectangle, including transparent
+# gaps between strokes. Both press and release use this same virtual method.
+replace("gumps/misc_buttons.h", "\tCheckmark_button(Gump* par, int px, int py);",
+'''\tCheckmark_button(Gump* par, int px, int py);
+    bool on_widget(int mx, int my) const override;''')
+replace("gumps/misc_buttons.cc", "bool Checkmark_button::activate(MouseButton button) {",
+'''bool Checkmark_button::on_widget(int mx, int my) const {
+#if defined(SDL_PLATFORM_IOS)
+    TileRect hit = get_rect();
+    hit.enlarge(3);
+    return hit.has_point(mx, my);
+#else
+    return Gump_widget::on_widget(mx, my);
+#endif
+}
+
+bool Checkmark_button::activate(MouseButton button) {''')
+
+# Let a tap outside the notebook dismiss the native keyboard. Do not open it
+# just for reading: tapping a page still starts text entry through on_button.
+replace("gumps/Notebook_gump.cc",
+'''            PLACEHOLDER''', '''PLACEHOLDER''') if False else None
+p = Path("upstream/gumps/Notebook_gump.cc")
+text = p.read_text()
+start = text.index("Notebook_gump* Notebook_gump::create()")
+end = text.index("Notebook_gump::~Notebook_gump()", start)
+section = text[start:end]
+anchor = """\t\t\tif (!SDL_TextInputActive(window)) {
+\t\t\t\tTouchUI::startTextInput(window);
+\t\t\t}"""
+if section.count(anchor) != 1: raise RuntimeError("Notebook keyboard anchor missing")
+section = section.replace(anchor, """#if !defined(SDL_PLATFORM_IOS)
+""" + anchor + """
+#else
+            if (SDL_TextInputActive(window)) SDL_StopTextInput(window);
+#endif""")
+text = text[:start] + section + text[end:]
+anchor = "\tGump_button* btn = Gump::on_button(mx, my);"
+if text.count(anchor) != 1: raise RuntimeError("Notebook input anchor missing")
+text = text.replace(anchor, """#if defined(SDL_PLATFORM_IOS)
+    if (!get_rect().has_point(mx, my)) {
+        SDL_Window* window = gwin->get_win()->get_screen_window();
+        if (SDL_TextInputActive(window)) SDL_StopTextInput(window);
+        return nullptr;
+    }
+#endif
+""" + anchor)
+p.write_text(text)
