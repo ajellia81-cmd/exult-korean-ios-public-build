@@ -7,17 +7,39 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ${{ github.ref == 'refs/heads/main' && 'macos-15-intel' || 'ubuntu-latest' }}
     env:
       DEVELOPER_DIR: ${{ github.ref == 'refs/heads/main' && '/Applications/Xcode_26.3.app/Contents/Developer' || '' }}
     steps:
+      - name: Cancel superseded builds
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPO/actions/workflows/build-unsigned-ipa.yml/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | .id' |
+          while read -r previous_run; do
+            if [ "$previous_run" != "$GITHUB_RUN_ID" ]; then
+              gh api --method POST "repos/$GH_REPO/actions/runs/$previous_run/cancel"
+            fi
+          done
+
       - uses: actions/checkout@v6
 
       - name: Verify selected Apple toolchain
         if: github.ref == 'refs/heads/main'
         run: |
+          xcodebuild -downloadComponent MetalToolchain
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
