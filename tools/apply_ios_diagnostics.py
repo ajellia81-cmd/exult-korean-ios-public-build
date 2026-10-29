@@ -701,3 +701,20 @@ static void InstallExultKeyboardDismissControl() {
     });
 }
 ''')
+
+# Every iOS takeover scene (BG/SI logos, intro, title, character creation,
+# credits and loading scenes) must fit its own source ratio, never stretch.
+# Layer inverse transforms already use this destination for touch mapping.
+replace("scene_layer.h",
+'''\t\t\tgwin->layer_set_opaque(handle, true);''',
+'''\t\t\tgwin->layer_set_opaque(handle, true);
+#ifdef SDL_PLATFORM_IOS
+            const int dw = iwin->get_display_width(), dh = iwin->get_display_height();
+            int width = dw;
+            int height = static_cast<int>(static_cast<long long>(dw) * scene_h / scene_w);
+            if (height > dh) {
+                height = dh;
+                width = static_cast<int>(static_cast<long long>(dh) * scene_w / scene_h);
+            }
+            gwin->layer_set_dest(handle, (dw - width) / 2, (dh - height) / 2, width, height);
+#endif''')
