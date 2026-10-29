@@ -28,3 +28,56 @@ audio=Path("upstream/audio/Audio.cc").read_text()
 assert "recovery!=\"yes\"&&music_pack" in audio
 assert 'config->set("config/audio/midi/use_oggs","yes",false);' in audio
 print("Startup regression checks passed")
+
+# Verify the production aspect helper across portrait/landscape and ultrawide
+# targets; this runs its actual C++ function, rather than a duplicate formula.
+import subprocess,tempfile
+a=menu.index("static void fit_launcher_scene(")
+b=menu.index("\n}\n",a)+2
+helper=menu[a:b]
+harness=r"""
+#include <cassert>
+#include <cmath>
+struct Win {
+ int w=1536,h=707;
+ int get_display_width(){return w;}
+ int get_display_height(){return h;}
+} win;
+struct Game_window {
+ int x,y,w,h;
+ static Game_window* get_instance();
+ Win* get_win(){return &win;}
+ void layer_set_dest(int,int xx,int yy,int ww,int hh){x=xx;y=yy;w=ww;h=hh;}
+} window;
+Game_window* Game_window::get_instance(){return &window;}
+struct Scene_view{int get_handle(){return 0;}};
+"""
+harness+=helper
+harness+=r"""
+int main(){
+ Scene_view scene;
+ for(auto dims: {std::pair<int,int>{1536,707},{2868,1320},{1024,768},{707,1536}}){
+  win.w=dims.first;win.h=dims.second;
+  for(auto src: {std::pair<int,int>{320,200},{360,225}}){
+   fit_launcher_scene(scene,src.first,src.second);
+   assert(window.w<=win.w&&window.h<=win.h);
+   assert(window.x>=0&&window.y>=0);
+   assert(std::abs(window.w*src.second-window.h*src.first)<=src.first);
+  }
+ }
+}
+"""
+harness="#include <utility>\n#include <initializer_list>\n"+harness
+with tempfile.TemporaryDirectory() as folder:
+ cpp=Path(folder)/"aspect.cpp";binary=Path(folder)/"aspect"
+ cpp.write_text(harness)
+ subprocess.run(["clang++","-std=c++17",str(cpp),"-o",str(binary)],check=True)
+ subprocess.run([str(binary)],check=True)
+# Every pre-selection full-screen scene has an explicit native-aspect fit.
+for name in ("welcome_scene","mods_scene","logo_scene","*menu_scene"):
+ assert "fit_launcher_scene("+name in menu
+assert 'EXULT_FLX_FONTS_ORIGINAL_VGA), PATCH_ORIGINAL_FONTS, 18, 1' in menu
+assert 'mapped=(index>=18&&index<=21)?95+index-18:90+index;' in font
+entries=Path("upstream/menulist.cc").read_text()
+assert entries.count("font_on->get_text_edge_padding")>=3
+print("Launcher scene aspect and text-bound checks passed")

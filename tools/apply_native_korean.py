@@ -466,3 +466,28 @@ text=text[:b]+'''
 #endif
 '''+text[b:]
 p.write_text(text)
+
+
+# Launcher text entries must reserve both normal and highlighted glyph bounds.
+# The font itself is unchanged; only the clipping rectangle grows.
+p=Path("upstream/menulist.cc");text=p.read_text()
+anchor='const int max_width  = font->get_text_width(text.c_str());'
+replacement='''const int max_width  = std::max(font->get_text_width(text.c_str()),
+            font_on->get_text_width(text.c_str())) + 2 * std::max(
+            font->get_text_edge_padding(text.c_str()),font_on->get_text_edge_padding(text.c_str()));'''
+if text.count(anchor)!=2:raise RuntimeError("Launcher text width anchors changed")
+text=text.replace(anchor,replacement)
+text=text.replace('const int max_height = font->get_text_height();',
+'''const int max_height = std::max(font->get_text_height(text.c_str()),
+            font_on->get_text_height(text.c_str())) + 4;''')
+# Game titles use multiline bounds and a per-line padding allowance.
+a=text.index('MenuGameEntry::MenuGameEntry(')
+b=text.index('void MenuGameEntry::paint',a)
+section=text[a:b]
+section=section.replace('int max_height = font->get_text_height();',
+'''int max_height = std::max(font->get_text_height(),font_on->get_text_height()) + 4;''')
+section=section.replace('font->get_text_width(lineptr)',
+'''std::max(font->get_text_width(lineptr),font_on->get_text_width(lineptr))
+        +2*std::max(font->get_text_edge_padding(lineptr),font_on->get_text_edge_padding(lineptr))''')
+text=text[:a]+section+text[b:]
+p.write_text(text)
