@@ -731,3 +731,26 @@ replace("scene_layer.h",
 replace("gumps/Text_button.cc",
         "const int text_height = font->get_text_height();",
         "const int text_height = font->get_text_height(text.c_str());")
+
+# Engine-owned touch actions, authored here; game-provided object/NPC/place
+# names remain obj->get_name() so the installed Korean translation is canonical.
+replace("gumps/ItemMenu_gump.cc", '#include "items.h"',
+        '#include "items.h"\n#include "font.h"')
+p = Path("upstream/gumps/ItemMenu_gump.cc")
+text = p.read_text()
+for message, korean in [
+    (0x650, "소지품 보기"), (0x651, "대화하기"),
+    (0x652, "내용물 보기"), (0x653, "사용하기"),
+    (0x654, "집기"), (0x655, "옮기기"), (0x656, "아무것도 안 하기")]:
+    original = "return get_text_msg(0x%x - msg_file_start);" % message
+    literal = "".join("\\x%02x" % byte for byte in korean.encode("euc_kr"))
+    if text.count(original) != 1: raise RuntimeError("Touch action anchor missing")
+    text = text.replace(original,
+        'if (legacy_korean_font_available()) return "' + literal + '";\n\t\t' + original)
+cancel = "".join("\\x%02x" % byte for byte in "취소".encode("euc_kr"))
+anchor = "class Strings : public GumpStrings {\npublic:"
+if text.count(anchor) != 1: raise RuntimeError("Touch strings anchor missing")
+text = text.replace(anchor, anchor + '\n    static const char* Cancel() {\n'
+    '        if (legacy_korean_font_available()) return "' + cancel + '";\n'
+    '        return GumpStrings::Cancel();\n    }')
+p.write_text(text)
