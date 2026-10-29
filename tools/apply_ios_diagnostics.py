@@ -726,3 +726,8 @@ replace("scene_layer.h",
             }
             gwin->layer_set_dest(handle, (dw - width) / 2, (dh - height) / 2, width, height);
 #endif''')
+
+# Button centering must measure the actual Korean label, not Latin-only metrics.
+replace("gumps/Text_button.cc",
+        "const int text_height = font->get_text_height();",
+        "const int text_height = font->get_text_height(text.c_str());")
