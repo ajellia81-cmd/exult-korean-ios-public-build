@@ -560,11 +560,11 @@ static void fit_launcher_scene(Scene_view& scene, int w, int h) {
     auto* gwin = Game_window::get_instance();
     auto* win = gwin->get_win();
     const int dw = win->get_display_width(), dh = win->get_display_height();
-    // DOS 320x200 art targets a 4:3 display (non-square source pixels).
-    int width = dw, height = static_cast<int>(static_cast<long long>(dw) * 3 / 4);
+    // Exult launcher artwork uses its native 16:10 source aspect ratio.
+    int width = dw, height = static_cast<int>(static_cast<long long>(dw) * h / w);
     if (height > dh) {
         height = dh;
-        width = static_cast<int>(static_cast<long long>(dh) * 4 / 3);
+        width = static_cast<int>(static_cast<long long>(dh) * w / h);
     }
     gwin->layer_set_dest(scene.get_handle(), (dw - width) / 2, (dh - height) / 2, width, height);
 }
