@@ -613,11 +613,7 @@ anchor = """\t\t\tif (!SDL_TextInputActive(window)) {
 \t\t\t\tTouchUI::startTextInput(window);
 \t\t\t}"""
 if section.count(anchor) != 1: raise RuntimeError("Notebook keyboard anchor missing")
-section = section.replace(anchor, """#if !defined(SDL_PLATFORM_IOS)
-""" + anchor + """
-#else
-            if (SDL_TextInputActive(window)) SDL_StopTextInput(window);
-#endif""")
+# Preserve upstream automatic text-input activation on every platform.
 text = text[:start] + section + text[end:]
 anchor = "\tGump_button* btn = Gump::on_button(mx, my);"
 if text.count(anchor) != 1: raise RuntimeError("Notebook input anchor missing")
