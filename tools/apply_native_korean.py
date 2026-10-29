@@ -343,3 +343,23 @@ text=text.replace("if(native_face){\n    int l,t,w,h;native_bounds(text,l,t,w,h)
     if(text&&length>=0){bounded.assign(text,length);text=bounded.c_str();}
     int l,t,w,h;native_bounds(text,l,t,w,h);''',1)
 p.write_text(text)
+
+
+# Font-mode checks run in inner layout loops. Probe the filesystem once per
+# game selection, not once per byte.
+p=Path("upstream/shapes/font.cc");text=p.read_text()
+a=text.index("static bool korean_patch_pack_present() {")
+b=text.index("\n}",a)+2
+text=text[:a]+'''static bool korean_patch_pack_present() {
+    static int checked_game=-999;
+    static bool present=false;
+    const int selected=static_cast<int>(Game::get_game_type());
+    if(checked_game==selected)return present;
+    checked_game=selected;
+    present=U7exists("<CONFIG>/patch/font0bg.fnt")
+        || U7exists("<CONFIG>/patch/FONT0BG.FNT")
+        || (is_system_path_defined("<PATCH>") &&
+            (U7exists("<PATCH>/font0bg.fnt") || U7exists("<PATCH>/font0si.fnt")));
+    return present;
+}'''+text[b:]
+p.write_text(text)
