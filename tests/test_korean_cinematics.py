@@ -85,7 +85,7 @@ int main(){
  auto face=fixture_font.native_face;
  assert(face->get(127));
  auto*bullet=face->get(127);auto*hangul=face->get(0xb0a1);
- assert(std::abs((bullet->y+bullet->top+bullet->bottom-bullet->top)/2.0 -
+ assert(std::abs(bullet->y+bullet->top+(bullet->bottom-bullet->top)/2.0 -
                  (hangul->y+hangul->top+(hangul->bottom-hangul->top)/2.0))<=2);
  Shape_frame caption;caption.h=70;caption.above=0;
  auto*sm=Shape_manager::get_instance();
