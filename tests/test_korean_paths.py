@@ -71,6 +71,7 @@ struct Font {
  int get_text_width(const char*,int);
  void get_text_box_dims(const char*,int&,int&,int=0);
  int find_xcursor(const char*,int,int);
+ void get_text_ink_bounds(const char*,int&,int&,int&,int&);
  int get_text_height();
  int get_text_height(const char*,int=-1);
  int get_text_baseline();
@@ -81,6 +82,7 @@ a=s.index("static bool legacy_korean_font_enabled");b=s.index("//\tWant a more r
 production=s[a:b]
 for name in ["int Font::paint_text(","int Font::paint_text_fixedwidth(","int Font::get_text_width(","void Font::get_text_box_dims(","int Font::find_xcursor(","int Font::get_text_height(","int Font::get_text_baseline("]:
     production+="\n"+"\n".join(overloads(name))
+production += "\n" + function("void Font::get_text_ink_bounds(")
 tests=r'''
 int main(){
  constexpr int gw=11,gh=11,stride=2,size=stride*gh;
@@ -103,12 +105,16 @@ int main(){
   std::string raw;raw+=char(0xb0+i/94);raw+=char(0xa1+i%94);
   assert(f.get_text_width(raw.c_str())==advance);
   assert(f.get_text_width(raw.data(),2)==advance);
+  int il,it,iw,ih; f.get_text_ink_bounds(raw.c_str(),il,it,iw,ih);
   auto validate=[&](){
    for(int bit=0;bit<12;++bit){
     const int x=bit%gw,y=bit/gw;
     assert((image.pixels[(1+y)*64+1+x]==1)==bool(i&(1<<bit)));
    }
    assert(image.pixels[3*64+1]==1);
+   for(int yy=0;yy<32;++yy)for(int xx=0;xx<32;++xx)
+    if(image.pixels[yy*64+xx]!=7)
+     assert(xx>=il&&xx<il+iw&&yy>=it&&yy<it+ih);
   };
   image.fill8(7);assert(f.paint_text(&image,raw.c_str(),0,0)==advance);validate();
   image.fill8(7);assert(f.paint_text(&image,raw.data(),2,0,0)==advance);validate();
@@ -125,6 +131,18 @@ int main(){
   ++checked;
  }
  assert(f.font_shapes->high_requests==0);
+ {
+  auto& source=f.font_shapes->ascii;
+  const auto saved=source.pixels;
+  std::fill(source.pixels.begin(),source.pixels.end(),0);
+  bool previous=set_legacy_korean_button_bold(true);
+  Korean_ascii_glyph digit(&source,-1,0);
+  assert(digit.yabove==12-(11-4)/2);
+  set_legacy_korean_button_bold(previous);
+  Korean_ascii_glyph ordinary(&source,-1,0);
+  assert(ordinary.yabove==1); // Dialogue/other paths retain the original origin.
+  source.pixels=saved;
+ }
  const std::string multi=std::string("\xb0\xa1")+"\n"+"\xc8\xfe";
  int w,h;f.get_text_box_dims(multi.c_str(),w,h);assert(w==advance&&h==2*f.get_text_height(multi.c_str()));
  assert(f.get_text_baseline(multi.c_str())==12); // Ink bottom precedes baseline; shadow fits below.

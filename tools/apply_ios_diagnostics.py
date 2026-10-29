@@ -821,3 +821,235 @@ replace("gumps/Sign_gump.cc",
         const int height = sman->get_text_height(font, lines[i].c_str());
         if (height > lheight) lheight = height;
     }''')
+
+
+# Audit fix: measure painted pixels, including negative bearings and shadows.
+replace("shapes/font.h", "\tint get_text_height();",
+        "\tvoid get_text_ink_bounds(const char* text, int& left, int& top, int& width, int& height);\n\tint get_text_height();")
+replace("shapes/font.cc", "int height() const { return glyph_height + 4; }",
+r'''int height() const { return glyph_height + 4; }
+    void ink_bounds(const char* text, bool outline, int& l, int& t, int& r, int& b) {
+        const auto index = (static_cast<unsigned char>(text[0]) - 0xb0) * 94
+                         + static_cast<unsigned char>(text[1]) - 0xa1;
+        const auto* glyph = glyphs.data() + index * bytes_per_glyph;
+        l = width(); t = height(); r = b = -1;
+        for (int y = 0; y < glyph_height; ++y)
+            for (int x = 0; x < glyph_width; ++x)
+                if (glyph[y * bytes_per_row + x / 8] & (0x80 >> (x % 8))) {
+                    l = std::min(l, x + 1); t = std::min(t, y + 1);
+                    r = std::max(r, x + 1); b = std::max(b, y + 1);
+                }
+        if (r < 0) return;
+        if (outline) { --l; --t; r += 2; b += 2; }
+        else if (legacy_korean_button_bold) ++r;
+    }''')
+# Small monochrome button digits must share the Korean ink's vertical centre.
+replace("shapes/font.cc",
+        "w = iw + 3; h = ih + 3; xleft = 1 - left; yabove = 1 - top;",
+'''w = iw + 3; h = ih + 3; xleft = 1 - left; yabove = 1 - top;
+        if (legacy_korean_button_bold && monochrome)
+            yabove = korean_font.height() - 3 - (korean_font.height() - 4 - ih) / 2;''')
+p = Path("upstream/shapes/font.cc")
+p.write_text(p.read_text() + r'''
+
+void Font::get_text_ink_bounds(const char* text, int& left, int& top, int& width, int& height) {
+    left = top = width = height = 0;
+    if (!text || !font_shapes) return;
+    const bool style = legacy_korean_layout_override || contains_legacy_korean(text, -1);
+    const int baseline = get_text_baseline(text);
+    const auto ink = korean_ink_colour(font_shapes.get());
+    const auto shadow = korean_ink_colour(font_shapes.get(), true);
+    int pen = 0, right = 0, bottom = 0;
+    bool found = false;
+    auto include = [&](int l, int t, int r, int b) {
+        if (r < l || b < t) return;
+        if (!found) { left = l; top = t; right = r; bottom = b; found = true; }
+        else { left = std::min(left, l); top = std::min(top, t);
+               right = std::max(right, r); bottom = std::max(bottom, b); }
+    };
+    for (int i = 0; text[i];) {
+        if (korean_font.is_pair(text + i, 2)) {
+            int l, t, r, b;
+            korean_font.ink_bounds(text + i, ink != shadow, l, t, r, b);
+            include(pen + l, t, pen + r, b);
+            pen += korean_font.width() + hor_lead; i += 2;
+            continue;
+        }
+        auto* shape = font_shapes->get_frame(static_cast<unsigned char>(text[i++]));
+        if (!shape || !shape->is_rle()) continue;
+        if (style) {
+            Korean_ascii_glyph glyph(shape, hor_lead, shadow);
+            for (int y = 0; y < glyph.h; ++y)
+                for (int x = 0; x < glyph.w; ++x)
+                    if (glyph.pixels[y * glyph.w + x] != 255)
+                        include(pen + x - glyph.xleft, baseline + y - glyph.yabove,
+                                pen + x - glyph.xleft, baseline + y - glyph.yabove);
+            pen += glyph.advance();
+        } else {
+            const int sw = shape->get_width(), sh = shape->get_height();
+            Image_buffer8 sample(sw, sh);
+            sample.fill8(255);
+            shape->paint_rle(&sample, shape->get_xleft(), shape->get_yabove());
+            for (int y = 0; y < sh; ++y)
+                for (int x = 0; x < sw; ++x)
+                    if (sample.get_pixel8(x, y) != 255)
+                        include(pen + x - shape->get_xleft(), baseline + y - shape->get_yabove(),
+                                pen + x - shape->get_xleft(), baseline + y - shape->get_yabove());
+            pen += sw + hor_lead;
+        }
+    }
+    if (found) { width = right - left + 1; height = bottom - top + 1; }
+}
+''')
+
+# Measure and paint buttons under the same weight/ASCII-layout scope.
+p = Path("upstream/gumps/Text_button.cc")
+text = p.read_text()
+a = text.index("namespace {\nstruct Korean_button_weight_scope")
+b = text.index("void Text_button::paint()", a)
+scope = text[a:b]
+text = text[:a] + text[b:]
+a = text.index("void Text_button::init()")
+text = text[:a] + scope + text[a:]
+text = text.replace("void Text_button::init() {", """void Text_button::init() {
+    Korean_button_weight_scope korean_weight;
+    int ink_left, ink_top, ink_width, ink_height;
+    font->get_text_ink_bounds(text.c_str(), ink_left, ink_top, ink_width, ink_height);""", 1)
+text = text.replace("const int text_height = font->get_text_height(text.c_str());",
+                    "const int text_height = ink_height;")
+text = text.replace("const int text_width = font->get_text_width(text.c_str());",
+                    "const int text_width = ink_width;")
+text = text.replace("text_y = (draw_area.h - text_height) / 2;",
+                    "text_y = (draw_area.h - text_height) / 2 - ink_top;")
+text = text.replace("text_x = (draw_area.w - text_width) >> 1;",
+                    "text_x = ((draw_area.w - text_width) >> 1) - ink_left;")
+p.write_text(text)
+
+# One sign path covers wood, gold, tombstones and runic scroll signs.
+# Fit a complete ink rectangle rather than clipping an over-wide inscription.
+replace("gumps/Sign_gump.cc", '#include "gamewin.h"',
+        '#include "gamewin.h"\n#include "font.h"\n#include "iwin8.h"\n#include <algorithm>')
+p = Path("upstream/gumps/Sign_gump.cc")
+text = p.read_text()
+old = """\t\tsman->paint_text(
+\t\t\t\tfont, lines[i].c_str(), x + object_area.x + (object_area.w - sman->get_text_width(font, lines[i].c_str())) / 2,
+\t\t\t\typos);"""
+new = """        auto face = sman->get_font(font);
+        int il, it, iw, ih;
+        face->get_text_ink_bounds(lines[i].c_str(), il, it, iw, ih);
+        if (iw > 0 && ih > 0) {
+            Image_buffer8 sample(iw, ih);
+            sample.fill8(255);
+            auto* target = gwin->push_render_target(&sample);
+            face->paint_text(&sample, lines[i].c_str(), -il, -it);
+            gwin->pop_render_target(target);
+            const int available = std::max(1, object_area.w - 8);
+            const int dw = std::min(iw, available);
+            const int dh = std::max(1, ih * dw / iw);
+            const int dx = x + object_area.x + (object_area.w - dw) / 2;
+            auto* output = gwin->get_win()->get_ib8();
+            for (int yy = 0; yy < dh; ++yy)
+                for (int xx = 0; xx < dw; ++xx) {
+                    const auto c = sample.get_pixel8(xx * iw / dw, yy * ih / dh);
+                    if (c != 255) output->put_pixel8(c, dx + xx, ypos + yy);
+                }
+        }"""
+if text.count(old) != 1: raise RuntimeError("Sign ink-fit anchor missing")
+text = text.replace(old, new)
+p.write_text(text)
+
+# Reserve paragraph edge space for glyph bearings/shadows. Preserve the outer
+# clip, so ink may use the reserved margin without disappearing at the edge.
+p = Path("upstream/shapes/font.cc")
+text = p.read_text()
+for signature in ("int Font::paint_text_box(", "int Font::paint_text_box_fixedwidth("):
+    a = text.index(signature)
+    brace = text.index("{", a)
+    depth = 0
+    for b in range(brace, len(text)):
+        if text[b] == "{": depth += 1
+        elif text[b] == "}":
+            depth -= 1
+            if depth == 0: break
+    section = text[a:b+1]
+    anchor = "\tconst int   endx"
+    addition = """    // Two pixels contain Korean outline/drop-shadow overhangs.
+    const int edge = std::min(2, std::max(0, (w - 1) / 2));
+    x += edge; w -= 2 * edge;
+"""
+    if section.count(anchor) != 1: raise RuntimeError("Text box edge anchor missing")
+    section = section.replace(anchor, addition + anchor, 1)
+    # A long Korean token must wrap at a full two-byte glyph, never disappear
+    # beyond the right edge. Keep the existing pagination return convention.
+    if signature == "int Font::paint_text_box(":
+        anchor = "\t\tif (curx + width - hor_lead > endx) {"
+        addition = """        if (korean_layout_override_unused) {}
+"""
+        addition = """        if (legacy_korean_layout_override && width - hor_lead > w) {
+            const char* split = text;
+            const char* next = text;
+            while (next < ewrd) {
+                next += korean_font.is_pair(next, static_cast<int>(ewrd - next)) ? 2 : 1;
+                if (get_text_width(text, static_cast<int>(next - text)) - hor_lead > w) break;
+                split = next;
+            }
+            if (split == text && text < ewrd)
+                split = text + (korean_font.is_pair(text, static_cast<int>(ewrd - text)) ? 2 : 1);
+            ewrd = split;
+            width = get_text_width(text, static_cast<int>(ewrd - text));
+        }
+"""
+        section = section.replace("const char* ewrd = Pass_word(text);", "const char* ewrd = Pass_word(text);")
+        section = section.replace(anchor, addition + anchor, 1)
+    text = text[:a] + section + text[b+1:]
+p.write_text(text)
+
+# Book and scroll pagination must use the same Korean height as the painter.
+replace("gumps/Text_gump.cc", "sman->get_text_height(font) + vlead;",
+        "sman->get_text_height(font, text + start) + vlead;")
+
+
+# A Korean line needs the full padded bitmap height even in a Latin font with
+# no descender. Do not enlarge English-only menus.
+p = Path("upstream/shapes/font.cc")
+text = p.read_text()
+text = rewrite_function(text, "int Font::get_text_height(const char* text, int length)", r'''int Font::get_text_height(const char* text, int length) {
+    const int height = get_text_height() + get_text_baseline(text, length) - get_text_baseline();
+    return (legacy_korean_layout_override || contains_legacy_korean(text, length))
+        ? std::max(height, korean_font.height()) : height;
+}''')
+p.write_text(text)
+
+# BG stock backing plates: align the complete 21px check frame vertically.
+# Apply only to the known default coordinates; custom patch coordinates win.
+p = Path("upstream/data/bg/gump_info.txt")
+text = p.read_text()
+for shape, x, old_y, new_y in [
+    (0,24,44,36), (1,24,52,49), (9,24,54,50), (10,24,50,46),
+    (11,24,44,38), (22,24,34,31), (27,24,34,32), (53,24,58,56),
+]:
+    before = ":%d/%d/%d/2" % (shape,x,old_y)
+    after = ":%d/%d/%d/2" % (shape,x,new_y)
+    if text.count(before) != 1: raise RuntimeError("Checkmark coordinate anchor missing")
+    text = text.replace(before,after)
+p.write_text(text)
+# Fallback coordinates are used when gump_info is unavailable.
+p = Path("upstream/gumps/Gump.cc")
+text = p.read_text()
+for name, old, new in [
+    ("box",44,36), ("crate",52,49), ("bag",54,50), ("backpack",50,46),
+    ("basket",44,38), ("chest",34,31), ("drawer",34,32), ("body",58,56),
+]:
+    a = text.index('game->get_shape("gumps/' + name + '")', text.index("void Container_gump::initialize"))
+    b = text.index(";", a)
+    section = text[a:b+1]
+    # BG and SI share some defaults; keep SI positions unchanged.
+    section = section.replace(", 24, %d)" % old,
+        ", 24, Game::get_game_type() == BLACK_GATE ? %d : %d)" % (new,old))
+    text = text[:a] + section + text[b+1:]
+# Dirty regions must include buttons outside the container background.
+text = text.replace("TileRect Gump::get_dirty() {\n\tTileRect rect = get_rect();",
+"""TileRect Gump::get_dirty() {
+    TileRect rect = get_rect();
+    for (auto* elem : elems) if (elem) rect = rect.add(elem->get_rect());""",1)
+p.write_text(text)
