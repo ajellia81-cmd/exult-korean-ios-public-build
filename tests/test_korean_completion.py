@@ -165,10 +165,12 @@ int main(){
   for(int sx:{180,360,720,1020})for(int sy:{90,240,540}){
    int gx,gy,lx,ly;image.screen_to_game(sx,sy,fast,gx,gy);
    assert(manager.map_game_to_gump(&g,gx,gy,lx,ly));
-   // Scaled integer round trips can lose at most a few screen pixels;
-   // the local error remains within a single logical pixel here.
-   assert(std::abs(lx-((sx-120)/3+100))<=2);
-   assert(std::abs(ly-((sy-60)/3+40))<=2);
+   // Normal-mode input is quantized to the game grid before this API.
+   // Bound that unavoidable error by one game pixel, mapped to this UI scale.
+   const int tx=fast?0:((image.scale*w+image.inter_width-1)/image.inter_width+2)/3;
+   const int ty=fast?0:((image.scale*image.display_height+image.inter_height-1)/image.inter_height+2)/3;
+   assert(std::abs(lx-((sx-120)/3+100))<=tx);
+   assert(std::abs(ly-((sy-60)/3+40))<=ty);
   }
  }
 }
