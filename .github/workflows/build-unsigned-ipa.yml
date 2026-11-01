@@ -104,7 +104,10 @@ jobs:
         working-directory: upstream
         run: >-
           xcodebuild build -scheme git_clone_release_dependencies
-          -project ios/Exult.xcodeproj
+          -project ios/Exult.xcodeproj -configuration Release
+          -derivedDataPath "$GITHUB_WORKSPACE/build"
+          GCC_GENERATE_DEBUGGING_SYMBOLS=NO GCC_OPTIMIZATION_LEVEL=s
+          DEAD_CODE_STRIPPING=YES ENABLE_TESTABILITY=NO MTL_ENABLE_DEBUG_INFO=NO
           CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
           CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
 
@@ -120,20 +123,25 @@ jobs:
         run: >-
           xcodebuild build -scheme Exult -configuration Release -sdk iphoneos
           -project ios/Exult.xcodeproj -derivedDataPath "$GITHUB_WORKSPACE/build"
+          GCC_GENERATE_DEBUGGING_SYMBOLS=NO GCC_OPTIMIZATION_LEVEL=s
+          DEAD_CODE_STRIPPING=YES ENABLE_TESTABILITY=NO MTL_ENABLE_DEBUG_INFO=NO
           CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
           CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED=NO
 
-      - name: Package IPA
+      - name: Package and audit compact production IPA
         if: github.ref == 'refs/heads/main'
         run: |
-          mkdir -p ipa/Payload
-          cp -R build/Build/Products/Release-iphoneos/Exult.app ipa/Payload/
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Ultima VII" ipa/Payload/Exult.app/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName Ultima VII" ipa/Payload/Exult.app/Info.plist
-          ditto -c -k --sequesterRsrc --keepParent ipa/Payload Exult-korean-engine-unsigned.ipa
+          python3 tools/package_release.py build/Build/Products/Release-iphoneos/Exult.app Exult-korean-release-unsigned.ipa previous-artifact.zip
+
+      - name: Upload release package audit
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-audit
+          path: release-package-audit.json
 
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
-          name: Exult-korean-engine-unsigned
-          path: Exult-korean-engine-unsigned.ipa
+          name: Exult-korean-release-unsigned
+          path: Exult-korean-release-unsigned.ipa

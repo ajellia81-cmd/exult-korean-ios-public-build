@@ -92,6 +92,14 @@ s,n=re.subn(pattern,r'''\1
 assert n==3
 # Existing entries should not override the compact policy.
 s=s.replace('DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";','DEBUG_INFORMATION_FORMAT = dwarf;')
+# Omit C/C++ assertion diagnostics in the production configurations.
+for a,b in reversed([(m.start(),s.index("\n\t\t\tname = Release;",m.start())) for m in re.finditer(pattern,s)]):
+ section=s[a:b]
+ section=section.replace("GCC_PREPROCESSOR_DEFINITIONS = (",'GCC_PREPROCESSOR_DEFINITIONS = (\n                    "NDEBUG=1",',1)
+ s=s[:a]+section+s[b:]
+# Omit the optional SDL dSYM build phase; symbols are not generated in this build.
+s,n=re.subn(r'shellScript = "if \[ -d .*?Generating dSYM.*?";', lambda m:'shellScript = "true\\n";',s)
+assert n==1
 # Remove duplicate setting lines inside individual build configurations.
 for a,b in reversed([(m.start(),s.index("\n\t\t\tname = Release;",m.start())) for m in re.finditer(pattern,s)]):
  section=s[a:b];seen=set();lines=[]
