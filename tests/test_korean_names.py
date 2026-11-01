@@ -15,6 +15,8 @@ assert 'return !get_flag(Obj_flags::met) ? Game_object::get_name() : get_npc_nam
 assert 'korean_actor_display_name(npc_num,name)' in actors
 assert 'npc->get_npc_name_string()' not in objects
 assert 'npc->get_npc_name()' in objects
+itemmenu=Path('upstream/gumps/ItemMenu_gump.cc').read_text()
+layout=method(itemmenu,'void Itemmenu_gump::fix_position(')
 read=method(actors,'static std::vector<unsigned char> korean_initial_npcs(')
 h=r'''
 #include <algorithm>
@@ -24,6 +26,17 @@ h=r'''
 #include <string>
 #include <vector>
 #include "korean_npc_names.h"
+struct TileRect{int x,y,w,h;};
+struct Game_window{
+ int width=320,height=200;
+ static Game_window* get_instance(){static Game_window win;return &win;}
+ int get_width(){return width;} int get_height(){return height;}
+};
+struct Itemmenu_gump{
+ int x=0,y=0,width=66,height=88;
+ TileRect get_rect(){return {x+10,y,width,height};}
+ void fix_position(int num_elements);
+};
 std::map<std::string,std::vector<unsigned char>> files;
 bool U7exists(const char*p){return files.count(p);}
 class IDataSource {};
@@ -34,7 +47,7 @@ struct IFileDataSource : public IDataSource {
  size_t getSize(){return data.size();}
  void read(unsigned char*p,size_t n){std::copy_n(data.begin(),n,p);}
 };
-'''+('\n#ifdef HAVE_ZIP_SUPPORT\n#include "files/zip/unzip.h"\n#endif\n')+read+r'''
+'''+layout+('\n#ifdef HAVE_ZIP_SUPPORT\n#include "files/zip/unzip.h"\n#endif\n')+read+r'''
 void u32(std::vector<unsigned char>&b,size_t p,unsigned n){
  for(unsigned i=0;i<4;++i)b[p+i]=(n>>(8*i))&255;
 }
@@ -55,6 +68,34 @@ int main(){
  auto original_source=source,original_target=target;
  assert(korean_resolve_name(names,1,en)==ko);
  assert(source==original_source&&target==original_target);
+
+ Korean_name_map reviewed;
+ korean_apply_reviewed_names(reviewed,true);
+ assert(reviewed.size()==22);
+ assert(korean_name_high(korean_resolve_name(reviewed,278,"Davros Illomen")));
+ assert(korean_resolve_name(reviewed,278,"Custom")=="Custom");
+ assert(korean_resolve_name(reviewed,0,"Doug")=="Doug");
+ assert(korean_resolve_name(reviewed,231,"Larry")=="Larry");
+ reviewed.clear();korean_apply_reviewed_names(reviewed,false);
+ assert(reviewed.size()==21);
+ assert(korean_name_high(korean_resolve_name(reviewed,258,"steve_powers")));
+ assert(korean_resolve_name(reviewed,257,"Doug")=="Doug"); // game separation
+ std::map<std::string,std::string> terms={{"Abraham",ko},{"Meryl",ko}};
+ korean_reuse_names(reviewed,source,terms,false);
+ assert(korean_resolve_name(reviewed,299,"Abraham")==ko);
+ assert(korean_resolve_name(reviewed,234,"Meryl")==ko);
+ assert(korean_reference_text(target,korean_name_hash(target),8,4)==ko);
+ assert(korean_reference_text(target,0,8,4).empty());
+ assert(korean_reference_text(target,korean_name_hash(target),99,4).empty());
+ // Real production placement, including a translated button wider than
+ // the former fixed 100px estimate, at each screen edge.
+ for(int width:{66,100,180,300})for(int height:{22,88,176})
+  for(int px:{-200,0,240,500})for(int py:{-80,0,160,300}){
+   Itemmenu_gump menu;menu.x=px;menu.y=py;menu.width=width;menu.height=height;
+   menu.fix_position(4);const auto rect=menu.get_rect();
+   assert(rect.x>=0&&rect.y>=0&&rect.x+rect.w<=320&&rect.y+rect.h<=200);
+  }
+
  // Flex archive reading is bounded and read-only, also when the NPC member
  // is not the first member or malformed table entries precede it.
  std::vector<unsigned char> flex(256,0);
