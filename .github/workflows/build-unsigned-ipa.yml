@@ -44,6 +44,13 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Inspect previous IPA contents
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/ajellia81-cmd/exult-korean-ios-public-build/actions/artifacts/13075494108/zip > previous-artifact.zip
+          python3 tools/audit_release_package.py previous-artifact.zip previous-ipa-inventory.json
+
       - name: Fetch upstream source
         run: |
           git init upstream
@@ -58,7 +65,7 @@ jobs:
           git apply --check ../patches/legacy-korean-font.patch
           git apply ../patches/legacy-korean-font.patch
 
-      - name: Apply iOS device diagnostics
+      - name: Apply audited Korean and iOS fixes
         run: |
           python3 tools/apply_ios_diagnostics.py
           python3 tools/apply_native_korean.py
@@ -66,6 +73,7 @@ jobs:
           python3 tools/apply_korean_followup.py
           python3 tools/apply_korean_cinematics.py
           python3 tools/apply_korean_names.py
+          python3 tools/apply_release_cleanup.py
 
       - name: Test production Korean font loader with synthetic data
         run: |
@@ -81,12 +89,15 @@ jobs:
           python3 tests/test_korean_followup.py
           python3 tests/test_korean_cinematics.py
           python3 tests/test_korean_names.py
+          python3 tests/test_release_cleanup.py
 
       - name: Upload encoding audit report
         uses: actions/upload-artifact@v4
         with:
           name: korean-encoding-audit
-          path: korean-audit.json
+          path: |
+            korean-audit.json
+            previous-ipa-inventory.json
 
       - name: Fetch pinned iOS dependencies
         if: github.ref == 'refs/heads/main'
