@@ -26,14 +26,15 @@ h=r'''
 #include "korean_npc_names.h"
 std::map<std::string,std::vector<unsigned char>> files;
 bool U7exists(const char*p){return files.count(p);}
-struct IFileDataSource {
+class IDataSource {};
+struct IFileDataSource : public IDataSource {
  std::vector<unsigned char> data;
  IFileDataSource(const char*p,bool):data(files[p]){}
  bool good(){return true;}
  size_t getSize(){return data.size();}
  void read(unsigned char*p,size_t n){std::copy_n(data.begin(),n,p);}
 };
-'''+read+r'''
+'''+('\n#ifdef HAVE_ZIP_SUPPORT\n#include "files/zip/unzip.h"\n#endif\n')+read+r'''
 void u32(std::vector<unsigned char>&b,size_t p,unsigned n){
  for(unsigned i=0;i<4;++i)b[p+i]=(n>>(8*i))&255;
 }
@@ -75,4 +76,5 @@ with tempfile.TemporaryDirectory() as folder:
  cpp=Path(folder)/"names.cpp";binary=Path(folder)/"names";cpp.write_text(h)
  subprocess.run(["clang++","-std=c++17","-fsanitize=address,undefined","-Iupstream/shapes",str(cpp),"-o",str(binary)],check=True)
  subprocess.run([str(binary)],check=True)
+ subprocess.run(["clang++","-std=c++17","-DHAVE_ZIP_SUPPORT","-fsyntax-only","-Iupstream","-Iupstream/shapes",str(cpp)],check=True)
 print("PASS: canonical BG/SI metadata, hash/bounds guards, Avatar/custom/localized names preserved, read-only Flex member access and display routes")
