@@ -1,0 +1,182 @@
+{
+  "ipa_bytes": 17634722,
+  "uncompressed_bytes": 30035013,
+  "files": [
+    {
+      "path": "Payload/Exult.app/joypad-glass.png",
+      "bytes": 22194
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-southeast.png",
+      "bytes": 1640
+    },
+    {
+      "path": "Payload/Exult.app/Icon.png",
+      "bytes": 427040
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-northeast.png",
+      "bytes": 22848
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-east.png",
+      "bytes": 1397
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass.png",
+      "bytes": 1007
+    },
+    {
+      "path": "Payload/Exult.app/btn.png",
+      "bytes": 2555
+    },
+    {
+      "path": "Payload/Exult.app/AppIcon60x60@2x.png",
+      "bytes": 33040
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-west.png",
+      "bytes": 1394
+    },
+    {
+      "path": "Payload/Exult.app/joythumb-glass.png",
+      "bytes": 6493
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-southwest.png",
+      "bytes": 1637
+    },
+    {
+      "path": "Payload/Exult.app/iOS Launch Screen.storyboardc/exult-ivc-view-exult-vk-id.nib",
+      "bytes": 1878
+    },
+    {
+      "path": "Payload/Exult.app/iOS Launch Screen.storyboardc/UIViewController-exult-ivc.nib",
+      "bytes": 924
+    },
+    {
+      "path": "Payload/Exult.app/iOS Launch Screen.storyboardc/Info.plist",
+      "bytes": 255
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-northwest.png",
+      "bytes": 23049
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-north.png",
+      "bytes": 22652
+    },
+    {
+      "path": "Payload/Exult.app/Assets.car",
+      "bytes": 5549144
+    },
+    {
+      "path": "Payload/Exult.app/AppIcon76x76@2x~ipad.png",
+      "bytes": 51423
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-south.png",
+      "bytes": 1413
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-east.png",
+      "bytes": 23102
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-northeast.png",
+      "bytes": 1398
+    },
+    {
+      "path": "Payload/Exult.app/btnpressed.png",
+      "bytes": 2729
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-southeast.png",
+      "bytes": 22570
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-northwest.png",
+      "bytes": 1397
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-west.png",
+      "bytes": 22962
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/default.metallib",
+      "bytes": 46115
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/CMake/SDL3ConfigVersion.cmake",
+      "bytes": 2867
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/CMake/SDL3Config.cmake",
+      "bytes": 3950
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/INSTALL.md",
+      "bytes": 803
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/README.md",
+      "bytes": 486
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/SDL3",
+      "bytes": 1884536
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/LICENSE.txt",
+      "bytes": 884
+    },
+    {
+      "path": "Payload/Exult.app/Frameworks/SDL3.framework/Info.plist",
+      "bytes": 855
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-southwest.png",
+      "bytes": 22289
+    },
+    {
+      "path": "Payload/Exult.app/joypad-glass-south.png",
+      "bytes": 22365
+    },
+    {
+      "path": "Payload/Exult.app/data/dummy",
+      "bytes": 0
+    },
+    {
+      "path": "Payload/Exult.app/data/exult.flx",
+      "bytes": 841317
+    },
+    {
+      "path": "Payload/Exult.app/data/exult_si.flx",
+      "bytes": 10733374
+    },
+    {
+      "path": "Payload/Exult.app/data/midisfx.flx",
+      "bytes": 25324
+    },
+    {
+      "path": "Payload/Exult.app/data/exult_bg.flx",
+      "bytes": 2596041
+    },
+    {
+      "path": "Payload/Exult.app/Info.plist",
+      "bytes": 3103
+    },
+    {
+      "path": "Payload/Exult.app/dpadglass-north.png",
+      "bytes": 1187
+    },
+    {
+      "path": "Payload/Exult.app/Exult",
+      "bytes": 7603368
+    },
+    {
+      "path": "Payload/Exult.app/PkgInfo",
+      "bytes": 8
+    }
+  ]
+}

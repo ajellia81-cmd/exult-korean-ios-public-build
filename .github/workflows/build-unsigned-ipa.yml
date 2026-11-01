@@ -44,12 +44,8 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
-      - name: Inspect previous IPA contents
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api repos/ajellia81-cmd/exult-korean-ios-public-build/actions/artifacts/13075494108/zip > previous-artifact.zip
-          python3 tools/audit_release_package.py previous-artifact.zip previous-ipa-inventory.json
+      - name: Load audited release baseline
+        run: cp tools/release_baseline.json previous-ipa-inventory.json
 
       - name: Fetch upstream source
         run: |
@@ -131,7 +127,7 @@ jobs:
       - name: Package and audit compact production IPA
         if: github.ref == 'refs/heads/main'
         run: |
-          python3 tools/package_release.py build/Build/Products/Release-iphoneos/Exult.app Exult-korean-release-unsigned.ipa previous-artifact.zip
+          python3 tools/package_release.py build/Build/Products/Release-iphoneos/Exult.app Exult-korean-release-unsigned.ipa tools/release_baseline.json
 
       - name: Upload release package audit
         if: github.ref == 'refs/heads/main'

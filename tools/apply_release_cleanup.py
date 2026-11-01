@@ -19,8 +19,8 @@ for end in range(brace,len(s)):
 s=s[:start]+'''void KoreanIOSInitialize() {
     InstallExultKeyboardDismissControl();
     AVAudioSession* session = [AVAudioSession sharedInstance];
-    [session setCategory:AVAudioSessionCategoryPlayback error:nil];
-    [session setActive:YES error:nil];
+    [session setCategory:AVAudioSessionCategoryPlayback error:nullptr];
+    [session setActive:YES error:nullptr];
 }'''+s[end+1:]
 p.write_text(s)
 p=Path("upstream/exult.cc");s=p.read_text().replace("KoreanIOSDiagnostics","KoreanIOSInitialize")

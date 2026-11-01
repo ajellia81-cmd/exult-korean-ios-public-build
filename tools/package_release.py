@@ -58,7 +58,7 @@ for token in (b"KoreanIOSDiagnostics",b"exult-ios-stdout.txt",b"exult-ios-stderr
 for p in app.rglob("*"):
  if p.is_file():assert not forbidden(p),str(p)
 # Check that the only missing previous files are the reviewed development debris.
-previous=inventory(ipa_bytes(baseline))
+previous=json.loads(baseline.read_text()) if baseline.suffix==".json" else inventory(ipa_bytes(baseline))
 removed_names={"Payload/Exult.app/"+x["path"] for x in removed}
 current={"Payload/Exult.app/"+p.relative_to(app).as_posix() for p in app.rglob("*") if p.is_file()}
 missing={i["path"] for i in previous["files"]}-current
