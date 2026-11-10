@@ -69,6 +69,19 @@ int main(){
  assert(korean_resolve_name(names,1,en)==ko);
  assert(source==original_source&&target==original_target);
 
+
+ const std::string spaced=ko+" "+ko, joined=ko+"_"+ko;
+ Korean_name_map spaced_names;
+ for(int npc:{77,80,105,119}) {
+  spaced_names.emplace(npc,std::make_pair("Old_Name",joined));
+  assert(korean_resolve_display_name(spaced_names,npc,"Old_Name",true)==spaced);
+  assert(korean_resolve_display_name(spaced_names,npc,joined,true)==spaced);
+  assert(korean_resolve_display_name(spaced_names,npc,joined,false)==joined);
+  assert(korean_resolve_display_name(spaced_names,npc,"Custom_Name",true)=="Custom_Name");
+ }
+ assert(korean_resolve_display_name(spaced_names,0,joined,true)==joined);
+ assert(korean_resolve_display_name({},119,joined,true)==joined);
+
  Korean_name_map reviewed;
  korean_apply_reviewed_names(reviewed,true);
  assert(reviewed.size()==22);
@@ -77,8 +90,15 @@ int main(){
  assert(korean_resolve_name(reviewed,0,"Doug")=="Doug");
  assert(korean_resolve_name(reviewed,231,"Larry")=="Larry");
  reviewed.clear();korean_apply_reviewed_names(reviewed,false);
- assert(reviewed.size()==21);
+ assert(reviewed.size()==28);
  assert(korean_name_high(korean_resolve_name(reviewed,258,"steve_powers")));
+ assert(korean_resolve_name(reviewed,9,"Serv_05")=="\265\316\275\303\277\300\300\307 \307\317\300\316");
+ assert(korean_resolve_name(reviewed,83,"Acid_Automaton")=="\273\352\274\272 \300\332\265\277\261\342\260\350");
+ assert(korean_resolve_name(reviewed,100,"Eth_Automaton")=="\261\263\300\260\260\374");
+ assert(korean_resolve_name(reviewed,162,"Jail_03")=="\260\250\277\301 \271\256\301\366\261\342");
+ assert(korean_resolve_name(reviewed,186,"Guard18")=="\301\372\274\255\300\307 \260\346\272\361\272\264");
+ assert(korean_resolve_name(reviewed,197,"1Auto")=="\300\332\265\277\261\342\260\350 1\310\243");
+ assert(korean_resolve_name(reviewed,214,"Silent1")=="\270\273 \270\370 \307\317\264\302 \274\366\265\265\273\347");
  assert(korean_resolve_name(reviewed,257,"Doug")=="Doug"); // game separation
  std::map<std::string,std::string> terms={{"Abraham",ko},{"Meryl",ko}};
  korean_reuse_names(reviewed,source,terms,false);
